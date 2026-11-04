@@ -71,3 +71,21 @@ print(res)
 assert "Connected to" in res, res
 assert scans and scans[0] == "192.168.137.77"
 print("DIRECT PAIR OK")
+
+# ---- 'protocol fault' on the first try: Hinata restarts adb and retries
+print("\n--- protocol fault then success ---")
+restarts = []
+pc.restart_server = lambda: restarts.append(1)
+attempts = []
+def adb3(args, **k):
+    if args[0] == "pair":
+        attempts.append(args[1])
+        ok = len(attempts) >= 2
+        return subprocess.CompletedProcess(args, 0, stdout="Successfully paired" if ok else "",
+                                           stderr="" if ok else "error: protocol fault (couldn't read status message): No error")
+    return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+pc.adb = adb3
+ok, msg = pp._pair("192.168.137.77", 41999, "123456")
+print(ok, msg, "restarts:", len(restarts))
+assert ok and len(restarts) == 1
+print("RETRY OK")
