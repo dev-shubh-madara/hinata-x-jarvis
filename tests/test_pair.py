@@ -40,3 +40,34 @@ print(pp.pair_with_qr(OV()))
 hotspot.current_wifi=lambda: ("Shubh_Home_5G","WPA2-Personal")
 print(pp.pair_with_qr(OV()))
 print(hotspot.wifi_qr_payload("My;Net","p:a"))
+
+# ---- mDNS blocked by the firewall (laptop hotspot): Hinata must find the phone by itself
+print("\n--- mDNS blocked: direct scan ---")
+hotspot.current_wifi = lambda: ("SRU-Student", "Open")
+hotspot.client_ips = lambda: ["192.168.137.77"]
+cnt2 = iter([1])
+hotspot.client_count = lambda: next(cnt2, 1)
+pp._browse = lambda *a, **k: []
+scans = []
+pp._open_ports = lambda ip, **k: scans.append(ip) or [37111, 41999]
+def adb2(args, **k):
+    if args[:2] == ["mdns", "services"]:
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+    if args[0] == "pair":
+        ok = args[1].endswith(":41999")            # 41999 is the pairing port
+        return subprocess.CompletedProcess(args, 0, stdout="Successfully paired" if ok else "", stderr="" if ok else "failed")
+    if args[0] == "connect":
+        pc._state["serial"] = args[1]
+        return subprocess.CompletedProcess(args, 0, stdout=f"connected to {args[1]}", stderr="")
+    return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+pc.adb = adb2
+clock = [1000.0]
+def fake_time():
+    clock[0] += 4
+    return clock[0]
+pp.time.time = fake_time
+res = pp.pair_with_qr(OV())
+print(res)
+assert "Connected to" in res, res
+assert scans and scans[0] == "192.168.137.77"
+print("DIRECT PAIR OK")
