@@ -59,16 +59,39 @@ KEYS = {"home": 3, "back": 4, "call": 5, "end call": 6, "volume up": 24, "volume
 def adb_path(download: bool = False) -> str | None:
     if _state["adb"] and os.path.isfile(_state["adb"]):
         return _state["adb"]
-    candidates = [shutil.which("adb"),
-                  os.path.join(config.DATA_DIR, "platform-tools", "adb.exe"),
-                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Android", "Sdk", "platform-tools", "adb.exe")]
+    # our own copy first (always recent), then the Android SDK, then whatever is on PATH
+    candidates = [os.path.join(config.DATA_DIR, "platform-tools", "adb.exe"),
+                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Android", "Sdk", "platform-tools", "adb.exe"),
+                  shutil.which("adb")]
     for c in candidates:
         if c and os.path.isfile(c):
+            ver = _adb_version(c)
+            if ver and ver < (33, 0):
+                print(f"[phone] skipping old adb {'.'.join(map(str, ver))} at {c} (QR pairing needs 33+)")
+                continue
             _state["adb"] = c
+            print(f"[phone] using adb {'.'.join(map(str, ver)) if ver else '?'} at {c}")
             return c
     if download and os.name == "nt":
         return _download_platform_tools()
     return None
+
+
+def _adb_version(exe: str):
+    try:
+        out = subprocess.run([exe, "version"], capture_output=True, text=True, timeout=8,
+                             creationflags=_NO_WINDOW).stdout or ""
+        m = re.search(r"Version (\d+)\.(\d+)", out)
+        return (int(m.group(1)), int(m.group(2))) if m else None
+    except Exception:
+        return None
+
+
+def restart_server():
+    """Fixes a stuck adb (the usual cause of 'protocol fault' while pairing)."""
+    adb(["kill-server"], serial=False, timeout=10)
+    time.sleep(0.8)
+    adb(["start-server"], serial=False, timeout=20)
 
 
 def _download_platform_tools() -> str | None:
