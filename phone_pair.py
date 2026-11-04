@@ -110,13 +110,22 @@ def _load() -> dict:
 
 
 def _connect(ip: str, port: int) -> bool:
-    out = phone_control.adb(["connect", f"{ip}:{port}"], serial=False, timeout=10)
-    txt = (out.stdout or "") + (out.stderr or "")
-    ok = "connected to" in txt.lower()
-    if ok:
-        phone_control._state["serial"] = f"{ip}:{port}"
-        phone_control._state["screen"] = None
-    return ok
+    """adb connect - only True when the phone is really usable ('device', not offline/unauthorized)."""
+    addr = f"{ip}:{port}"
+    out = phone_control.adb(["connect", addr], serial=False, timeout=10)
+    txt = ((out.stdout or "") + (out.stderr or "")).lower()
+    if "connected to" not in txt:
+        return False
+    for _ in range(6):
+        state = (phone_control.adb(["-s", addr, "get-state"], serial=False, timeout=5).stdout or "").strip()
+        if state == "device":
+            phone_control._state["serial"] = addr
+            phone_control._state["screen"] = None
+            return True
+        time.sleep(0.5)
+    phone_control.adb(["disconnect", addr], serial=False, timeout=5)
+    print(f"[phone] {addr} connected but not usable ({state or 'no state'}) - phone not paired yet")
+    return False
 
 
 def auto_reconnect(wait: float = 5) -> bool:
@@ -184,6 +193,11 @@ ISOLATED_HELP = ("Your Wi-Fi '{ssid}' blocks devices from talking to each other 
                  "turn it ON, connect your PHONE to that hotspot, then say 'pair to phone' again. "
                  "Or plug the phone in with a USB cable (USB debugging on) - that works on any network.")
 
+FIREWALL_HELP = ("Your phone answered, but something on this laptop keeps cutting the secure pairing connection - "
+                 "almost always the McAfee (or Windows) firewall on the hotspot network. Open McAfee > Firewall > "
+                 "Internet connections for programs, add {adb} with Full access (or switch the firewall off for one "
+                 "minute), then say 'pair to phone' again.")
+
 STEPS = [
     "1. Phone and PC on the same Wi-Fi (college Wi-Fi? use PC Mobile hotspot)",
     "2. Settings > About phone > tap Build number 7x",
@@ -227,6 +241,10 @@ def pair_with_qr(overlay) -> str:
             return joined
     blocked = None
 
+    if str(getattr(config, "PAIR_METHOD", "code")).lower() != "qr":
+        phone_ip = (hotspot.client_ips() or [""])[0] if on_hotspot else ""
+        return _pair_with_code(overlay, phone_ip=phone_ip, net_name=net_name)
+
     name = _service_name(net_name)
     password = "".join(secrets.choice(string.digits) for _ in range(6))
     try:
@@ -258,7 +276,7 @@ def pair_with_qr(overlay) -> str:
                 break
             # Windows Firewall often blocks the phone's mDNS announcement (always on the hotspot).
             # Plan B: find the phone ourselves and knock on its ports until the pairing one answers.
-            if time.time() - started > 6 and time.time() - last_scan > 8:
+            if time.time() - started > 6 and last_scan == started:
                 last_scan = time.time()
                 panel.status("Looking for your phone directly...")
                 done = _scan_and_pair(on_hotspot, password, panel)
@@ -424,7 +442,7 @@ def _join_hotspot(overlay, hs: dict, why: str):
     steps = [f"Your Wi-Fi: {why}, so I turned on the laptop's own Wi-Fi.",
              "1. Open your phone CAMERA and scan this QR - join the Wi-Fi",
              f"   (or join manually:  {hs['ssid']}   password  {hs['password']})",
-             "2. Then I'll show the pairing QR automatically"]
+             "2. Then I'll ask for the pairing code automatically"]
     panel = overlay.show_qr("STEP 1 - JOIN LAPTOP WI-FI", img, steps,
                             footer=f"Hotspot {hs['ssid']} is ON - waiting for your phone...",
                             subtitle="Connect your phone to the laptop's Wi-Fi", code_button=False)
@@ -434,7 +452,7 @@ def _join_hotspot(overlay, hs: dict, why: str):
             if panel.cancelled.is_set():
                 return "Okay, cancelled phone pairing."
             if panel.use_code.is_set() or hotspot.client_count() > 0:
-                panel.status("Phone joined! Opening the pairing QR...")
+                panel.status("Phone joined! Next: the pairing code...")
                 time.sleep(1.2)
                 return None
             time.sleep(1.5)
@@ -443,31 +461,64 @@ def _join_hotspot(overlay, hs: dict, why: str):
         panel.close()
 
 
-def _pair_with_code(overlay) -> str:
-    """Fallback when QR/mDNS is blocked: the classic pairing-code flow."""
-    addr = overlay.ask_text("On your phone: Wireless debugging > 'Pair device with pairing code'.\n"
-                            "Enter the IP address & port shown there (e.g. 192.168.1.42:37251):",
-                            title="Pair with code")
-    if not addr or ":" not in addr:
+def _parse_code_input(text: str, phone_ip: str):
+    """Accepts '482913 41234', '192.168.137.5:41234 482913', '41234 482913'... -> (ip, port, code)."""
+    t = text.strip()
+    m = re.search(r"(\d+\.\d+\.\d+\.\d+)\s*:\s*(\d{2,5})", t)
+    ip, port = (m.group(1), int(m.group(2))) if m else (phone_ip, 0)
+    rest = t[:m.start()] + " " + t[m.end():] if m else t
+    nums = re.findall(r"\d+", rest)
+    code = next((n for n in nums if len(n) == 6), "")
+    if not port:
+        port = next((int(n) for n in nums if n != code and 1024 <= int(n) <= 65535 and len(n) <= 5), 0)
+    return ip, port, code
+
+
+def _pair_with_code(overlay, phone_ip: str = "", net_name: str = "") -> str:
+    """Pairing with the 6-digit Wi-Fi pairing code (works even where QR discovery is blocked)."""
+    where = f" (the phone must be on the Wi-Fi '{net_name}')" if net_name else ""
+    ask_ip = "" if phone_ip else "the IP address:port and "
+    text = overlay.ask_text(
+        f"On your phone{where}:\nSettings > Developer options > Wireless debugging > "
+        "'Pair device with pairing code'.\n\n"
+        f"Type {ask_ip}the port and the 6-digit code shown there.\n"
+        f"Example:  {'192.168.137.5:41234 ' if not phone_ip else '41234 '}482913",
+        title="Pair with code")
+    if not text:
         return "Okay, cancelled phone pairing."
-    code = overlay.ask_text("Enter the 6-digit Wi-Fi pairing code:", title="Pair with code")
-    if not code:
-        return "Okay, cancelled phone pairing."
-    ip, _, port = addr.strip().rpartition(":")
-    ok, msg = _pair(ip.strip(), int(port) if port.isdigit() else 0, re.sub(r"\D", "", code))
+    ip, port, code = _parse_code_input(text, phone_ip)
+    if not ip:
+        more = overlay.ask_text("Now type the IP address shown on the phone (e.g. 192.168.137.5):",
+                                title="Pair with code")
+        ip = (more or "").strip()
+    if not (ip and port and code):
+        return ("I need the IP, the port and the 6-digit code from the 'Pair device with pairing code' "
+                "screen. Say 'pair to phone' to try again.")
+    print(f"[pair] pairing code -> {ip}:{port}")
+    ok, msg = _pair(ip, port, code, tries=2)
     if not ok:
-        return (f"Pairing failed: {msg[:120]}. Check the code (it changes each time) and that McAfee or "
-                "Windows Firewall isn't blocking adb.exe.")
-    ip = ip.strip()
-    if auto_reconnect(wait=6) or phone_control.is_connected():
-        _save({"ip": ip, "paired_at": int(time.time())})
-        return "Your phone is paired and connected."
-    conn = overlay.ask_text("Paired! Now enter the IP address & port at the TOP of the "
-                            "Wireless debugging screen:", title="Pair with code")
-    if conn and ":" in conn and _connect(*conn.strip().rsplit(":", 1)):
-        _save({"ip": ip, "paired_at": int(time.time())})
-        return "Your phone is paired and connected."
-    return "Paired, but not connected yet. Say 'connect my phone' to retry."
+        if "protocol fault" in msg.lower() or "connection" in msg.lower() and "refused" not in msg.lower():
+            return FIREWALL_HELP.format(adb=phone_control.adb_path() or "adb.exe")
+        return (f"Pairing failed: {msg[:120]}. The code and port change every time you open that screen - "
+                "say 'pair to phone' and type the new ones.")
+
+    # paired! now open the actual connection (different port - shown at the top of Wireless debugging)
+    time.sleep(1.5)
+    for p in _open_ports(ip):
+        if p != port and _connect(ip, p):
+            break
+    if not phone_control.is_connected():
+        conn = overlay.ask_text("Paired! Last step: type the IP address & port shown at the TOP of the "
+                                "Wireless debugging screen (e.g. 192.168.137.5:39857):", title="Pair with code")
+        c_ip, c_port, _ = _parse_code_input(conn or "", ip)
+        if not (c_port and _connect(c_ip or ip, c_port)):
+            return "Paired, but not connected yet. Say 'connect my phone' in a moment."
+    model = phone_control.shell("getprop ro.product.model") or "your phone"
+    serial = phone_control._state["serial"] or ""
+    _save({"ip": ip, "port": int(serial.split(":")[-1]) if ":" in serial else 0,
+           "model": model, "paired_at": int(time.time())})
+    return (f"Connected to {model}. Say 'on my phone' before any command, like "
+            f"'on my phone open WhatsApp'.")
 
 
 def connect_existing() -> str:
