@@ -90,6 +90,39 @@ def start() -> dict:
     return {"error": r.get("ERR") or f"hotspot state {r.get('STATE', 'unknown')}"}
 
 
+_PS_CLIENT_IPS = _PS_HEAD + r"""
+foreach ($c in $tm.GetTetheringClients()) { foreach ($h in $c.HostNames) { 'IP=' + $h.CanonicalName } }
+"""
+
+
+def client_ips() -> list[str]:
+    """IPv4 addresses of devices connected to the laptop's hotspot."""
+    ips = []
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", _PS_CLIENT_IPS],
+                             capture_output=True, text=True, timeout=15, creationflags=_NO_WINDOW).stdout or ""
+        ips = re.findall(r"IP=(\d+\.\d+\.\d+\.\d+)", out)
+    except Exception:
+        pass
+    return ips or arp_neighbors("192.168.137.")
+
+
+def arp_neighbors(prefix: str = "") -> list[str]:
+    """Devices this laptop has recently talked to on the local network (from the ARP table)."""
+    try:
+        out = subprocess.run(["arp", "-a"], capture_output=True, text=True, timeout=5,
+                             creationflags=_NO_WINDOW).stdout or ""
+    except Exception:
+        return []
+    ips = []
+    for ip, kind in re.findall(r"(\d+\.\d+\.\d+\.\d+)\s+[0-9a-f-]{17}\s+(\w+)", out, re.I):
+        last = int(ip.rsplit(".", 1)[1])
+        first = int(ip.split(".", 1)[0])
+        if kind.lower() == "dynamic" and ip.startswith(prefix) and 1 < last < 255 and first < 224:
+            ips.append(ip)
+    return list(dict.fromkeys(ips))
+
+
 def client_count() -> int:
     try:
         return int(_ps(_PS_CLIENTS, timeout=15).get("CLIENTS", "0"))
