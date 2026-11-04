@@ -32,6 +32,7 @@ import phone_control
 PAIR_TYPE = "_adb-tls-pairing._tcp.local."
 CONNECT_TYPE = "_adb-tls-connect._tcp.local."
 PAIR_TIMEOUT = 180
+os.environ.setdefault("ADB_MDNS_OPENSCREEN", "1")     # adb's own built-in mDNS (works on more PCs)
 _PHONE_FILE = os.path.join(config.DATA_DIR, "phone.json")
 
 
@@ -134,6 +135,18 @@ def auto_reconnect(wait: float = 5) -> bool:
             _save(saved)
             print(f"[phone] reconnected to {ip}:{port}")
             return True
+    # mDNS blocked (firewall / hotspot): try the saved IP and nearby devices directly
+    ips = [saved["ip"]] if saved.get("ip") else []
+    ips += [ip for ip in _candidate_ips(bool(hotspot.client_ips())) if ip not in ips]
+    for ip in ips[:6]:
+        if saved.get("port") and _connect(ip, int(saved["port"])):
+            return True
+        for port in _open_ports(ip):
+            if _connect(ip, port):
+                saved.update(ip=ip, port=port)
+                _save(saved)
+                print(f"[phone] reconnected to {ip}:{port} (direct)")
+                return True
     return False
 
 
@@ -198,6 +211,7 @@ def pair_with_qr(overlay) -> str:
     ssid, auth = hotspot.current_wifi()
     print(f"[phone] laptop Wi-Fi: {ssid or 'none'} ({auth or '?'})")
     net_name = ssid
+    on_hotspot = False
     if hotspot.is_isolated(ssid, auth) or not ssid:
         # college / open Wi-Fi blocks phone<->laptop traffic: make the laptop the Wi-Fi
         why = (f"'{ssid}' blocks devices from seeing each other" if ssid else "the laptop isn't on Wi-Fi")
@@ -207,6 +221,7 @@ def pair_with_qr(overlay) -> str:
             print(f"[phone] hotspot failed: {hs['error']}")
             return ISOLATED_HELP.format(ssid=ssid or "this network")
         net_name = hs["ssid"]
+        on_hotspot = True
         joined = _join_hotspot(overlay, hs, why)
         if joined is not None:
             return joined
@@ -225,6 +240,8 @@ def pair_with_qr(overlay) -> str:
     try:
         deadline = time.time() + PAIR_TIMEOUT
         target = None
+        started = last_scan = time.time()
+        paired_direct = None
         while time.time() < deadline and not panel.cancelled.is_set():
             if panel.use_code.is_set():
                 panel.close()
@@ -239,8 +256,21 @@ def pair_with_qr(overlay) -> str:
                         target = (m.group(1), m.group(2), int(m.group(3)))
             if target:
                 break
+            # Windows Firewall often blocks the phone's mDNS announcement (always on the hotspot).
+            # Plan B: find the phone ourselves and knock on its ports until the pairing one answers.
+            if time.time() - started > 6 and time.time() - last_scan > 8:
+                last_scan = time.time()
+                panel.status("Looking for your phone directly...")
+                done = _scan_and_pair(on_hotspot, password, panel)
+                if done:
+                    paired_direct = done
+                    break
+                panel.status(f"Laptop Wi-Fi: {net_name}  -  waiting for your phone...")
         if panel.cancelled.is_set():
             return "Okay, cancelled phone pairing."
+        if paired_direct:
+            ip, ports = paired_direct
+            return _finish_direct(ip, ports, panel)
         if not target and blocked:
             return ISOLATED_HELP.format(ssid=blocked)
         if not target:
@@ -286,6 +316,76 @@ def pair_with_qr(overlay) -> str:
                 f"'on my phone open WhatsApp' or 'call Vishal on my phone'.")
     finally:
         panel.close()
+
+
+def _candidate_ips(on_hotspot: bool) -> list[str]:
+    if on_hotspot:
+        return hotspot.client_ips()[:6]
+    me = _local_ip()
+    if me.count(".") != 3:
+        return []
+    near = hotspot.arp_neighbors(me.rsplit(".", 1)[0] + ".")
+    gateway_like = {me.rsplit(".", 1)[0] + "." + x for x in ("1", "254")}
+    return [ip for ip in near if ip not in gateway_like and ip != me][:8]
+
+
+def _open_ports(ip: str, lo: int = 30000, hi: int = 65535, timeout: float = 0.6) -> list[int]:
+    """TCP ports open on the phone (wireless debugging uses random high ports)."""
+    import asyncio
+
+    async def probe(port, sem):
+        async with sem:
+            try:
+                _r, w = await asyncio.wait_for(asyncio.open_connection(ip, port), timeout)
+                w.close()
+                return port
+            except Exception:
+                return None
+
+    async def run():
+        sem = asyncio.Semaphore(1200)
+        found = await asyncio.gather(*(probe(p, sem) for p in range(lo, hi + 1)))
+        return [p for p in found if p]
+    try:
+        return asyncio.run(run())
+    except Exception as e:
+        print(f"[pair] port scan failed: {e}")
+        return []
+
+
+def _scan_and_pair(on_hotspot: bool, password: str, panel):
+    """Pairs without mDNS. Returns (ip, open_ports) on success, else None."""
+    for ip in _candidate_ips(on_hotspot):
+        t0 = time.time()
+        ports = _open_ports(ip)
+        print(f"[pair] {ip}: open ports {ports[:10]} ({time.time() - t0:.1f}s)")
+        for port in ports:
+            panel.status(f"Phone found at {ip} - pairing...")
+            res = phone_control.adb(["pair", f"{ip}:{port}", password], serial=False, timeout=10)
+            if "success" in ((res.stdout or "") + (res.stderr or "")).lower():
+                print(f"[pair] paired directly with {ip}:{port}")
+                return ip, [p for p in ports if p != port]
+    return None
+
+
+def _finish_direct(ip: str, ports: list[int], panel) -> str:
+    panel.status("Paired! Connecting...")
+    time.sleep(1.5)
+    tries = ports or []
+    if not any(_connect(ip, p) for p in tries):
+        for p in _open_ports(ip):                     # the connect port can change after pairing
+            if _connect(ip, p):
+                break
+    if not phone_control.is_connected():
+        return ("Paired! Now say 'connect my phone' - or check that Wireless debugging is still on.")
+    model = phone_control.shell("getprop ro.product.model") or "your phone"
+    serial = phone_control._state["serial"] or ""
+    _save({"ip": ip, "port": int(serial.split(":")[-1]) if ":" in serial else 0,
+           "model": model, "paired_at": int(time.time())})
+    panel.status(f"Connected to {model}")
+    time.sleep(1.2)
+    return (f"Connected to {model}. Say 'on my phone' before any command, like "
+            f"'on my phone open WhatsApp' or 'call Vishal on my phone'.")
 
 
 def _service_name(net: str) -> str:
