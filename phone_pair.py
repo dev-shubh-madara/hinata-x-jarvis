@@ -198,7 +198,7 @@ def pair_with_qr(overlay) -> str:
     if phone_control.adb_path(download=True) is None:
         return ("I need Google's adb tool and couldn't download it. Install Android "
                 "platform-tools and add it to PATH, then say 'pair to phone' again.")
-    phone_control.adb(["start-server"], serial=False, timeout=15)
+    phone_control.restart_server()               # clean adb = no stale 'protocol fault'
 
     usb = phone_control.usb_device()
     if usb:                                     # cable plugged in - no QR needed
@@ -279,12 +279,15 @@ def pair_with_qr(overlay) -> str:
 
         _, ip, port = target
         panel.status(f"Phone found at {ip} - pairing...")
-        res = phone_control.adb(["pair", f"{ip}:{port}", password], serial=False, timeout=20)
-        if "success" not in ((res.stdout or "") + (res.stderr or "")).lower():
-            msg = (res.stderr or res.stdout or "unknown error").strip()
-            if blocked:
-                return ISOLATED_HELP.format(ssid=blocked)
-            return f"Pairing failed: {msg}. Say 'pair to phone' to try again."
+        ok, msg = _pair(ip, port, password)
+        if not ok:
+            panel.status("Trying another way...")
+            done = _scan_and_pair(on_hotspot, password, panel, only_ip=ip)
+            if done:
+                return _finish_direct(done[0], done[1], panel)
+            print(f"[pair] QR pairing failed ({msg}) - switching to pairing code")
+            panel.close()
+            return ("QR pairing didn't go through (" + msg[:80] + "). " + _pair_with_code(overlay))
 
         panel.status("Paired! Connecting...")
         connected = False
@@ -316,6 +319,24 @@ def pair_with_qr(overlay) -> str:
                 f"'on my phone open WhatsApp' or 'call Vishal on my phone'.")
     finally:
         panel.close()
+
+
+def _pair(ip: str, port: int, password: str, tries: int = 3) -> tuple[bool, str]:
+    """adb pair with retries. 'protocol fault' is usually a stuck adb server - restart it and retry."""
+    msg = ""
+    for i in range(tries):
+        res = phone_control.adb(["pair", f"{ip}:{port}", password], serial=False, timeout=15)
+        out = ((res.stdout or "") + (res.stderr or "")).strip()
+        if "success" in out.lower():
+            return True, out
+        msg = out or "no answer"
+        print(f"[pair] attempt {i + 1} at {ip}:{port} failed: {msg}")
+        if "wrong password" in msg.lower():
+            break
+        if i < tries - 1:
+            phone_control.restart_server()
+            time.sleep(1.0)
+    return False, msg
 
 
 def _candidate_ips(on_hotspot: bool) -> list[str]:
@@ -353,16 +374,16 @@ def _open_ports(ip: str, lo: int = 30000, hi: int = 65535, timeout: float = 0.6)
         return []
 
 
-def _scan_and_pair(on_hotspot: bool, password: str, panel):
+def _scan_and_pair(on_hotspot: bool, password: str, panel, only_ip: str = ""):
     """Pairs without mDNS. Returns (ip, open_ports) on success, else None."""
-    for ip in _candidate_ips(on_hotspot):
+    for ip in ([only_ip] if only_ip else _candidate_ips(on_hotspot)):
         t0 = time.time()
         ports = _open_ports(ip)
         print(f"[pair] {ip}: open ports {ports[:10]} ({time.time() - t0:.1f}s)")
         for port in ports:
             panel.status(f"Phone found at {ip} - pairing...")
-            res = phone_control.adb(["pair", f"{ip}:{port}", password], serial=False, timeout=10)
-            if "success" in ((res.stdout or "") + (res.stderr or "")).lower():
+            ok, _msg = _pair(ip, port, password, tries=2)
+            if ok:
                 print(f"[pair] paired directly with {ip}:{port}")
                 return ip, [p for p in ports if p != port]
     return None
@@ -432,10 +453,12 @@ def _pair_with_code(overlay) -> str:
     code = overlay.ask_text("Enter the 6-digit Wi-Fi pairing code:", title="Pair with code")
     if not code:
         return "Okay, cancelled phone pairing."
-    res = phone_control.adb(["pair", addr.strip(), code.strip()], serial=False, timeout=20)
-    if "success" not in ((res.stdout or "") + (res.stderr or "")).lower():
-        return f"Pairing failed: {(res.stderr or res.stdout or '').strip()}"
-    ip = addr.split(":")[0].strip()
+    ip, _, port = addr.strip().rpartition(":")
+    ok, msg = _pair(ip.strip(), int(port) if port.isdigit() else 0, re.sub(r"\D", "", code))
+    if not ok:
+        return (f"Pairing failed: {msg[:120]}. Check the code (it changes each time) and that McAfee or "
+                "Windows Firewall isn't blocking adb.exe.")
+    ip = ip.strip()
     if auto_reconnect(wait=6) or phone_control.is_connected():
         _save({"ip": ip, "paired_at": int(time.time())})
         return "Your phone is paired and connected."
