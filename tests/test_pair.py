@@ -1,6 +1,7 @@
 import os, sys, types, threading
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-import phone_pair as pp, phone_control as pc, hotspot
+import phone_pair as pp, phone_control as pc, hotspot, config
+config.PAIR_METHOD = "qr"      # these scenarios test the QR flow
 pc.adb_path=lambda download=False: "adb"
 import subprocess
 calls=[]
@@ -9,6 +10,7 @@ def fake_adb(args, **k):
     if args[:2]==["mdns","services"]:
         return subprocess.CompletedProcess(args,0,stdout=f"{fake_adb.name}\t_adb-tls-pairing._tcp\t192.168.137.50:41000\n",stderr="")
     if args[0]=="pair": return subprocess.CompletedProcess(args,0,stdout="Successfully paired",stderr="")
+    if "get-state" in args: return subprocess.CompletedProcess(args,0,stdout="device",stderr="")
     return subprocess.CompletedProcess(args,0,stdout="",stderr="")
 fake_adb.name="x"
 pc.adb=fake_adb
@@ -56,6 +58,8 @@ def adb2(args, **k):
     if args[0] == "pair":
         ok = args[1].endswith(":41999")            # 41999 is the pairing port
         return subprocess.CompletedProcess(args, 0, stdout="Successfully paired" if ok else "", stderr="" if ok else "failed")
+    if "get-state" in args:
+        return subprocess.CompletedProcess(args, 0, stdout="device", stderr="")
     if args[0] == "connect":
         pc._state["serial"] = args[1]
         return subprocess.CompletedProcess(args, 0, stdout=f"connected to {args[1]}", stderr="")
@@ -89,3 +93,46 @@ ok, msg = pp._pair("192.168.137.77", 41999, "123456")
 print(ok, msg, "restarts:", len(restarts))
 assert ok and len(restarts) == 1
 print("RETRY OK")
+
+
+# ---- pairing-code flow (the default): user types "port code", Hinata pairs and connects by itself
+print("\n--- pairing code ---")
+config.PAIR_METHOD = "code"
+hotspot.current_wifi = lambda: ("SRU-Student", "Open")
+hotspot.client_ips = lambda: ["192.168.137.223"]
+hotspot.client_count = lambda: 1
+pc.usb_device = lambda: None
+state = {"paired": False}
+def adb4(args, **k):
+    if args[0] == "pair":
+        state["paired"] = args[1] == "192.168.137.223:41234" and args[2] == "482913"
+        return subprocess.CompletedProcess(args, 0, stdout="Successfully paired" if state["paired"] else "", stderr="")
+    if "get-state" in args:
+        return subprocess.CompletedProcess(args, 0, stdout="device" if state["paired"] else "offline", stderr="")
+    if args[0] == "connect":
+        return subprocess.CompletedProcess(args, 0, stdout=f"connected to {args[1]}", stderr="")
+    return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+pc.adb = adb4
+pp._open_ports = lambda ip, **k: [41234, 46888]
+pc.connected_devices = lambda: [pc._state["serial"]] if pc._state["serial"] else []
+pc.is_connected = lambda: bool(pc._state["serial"])
+pc._state["serial"] = None
+class OV2(OV):
+    def ask_text(self, prompt, title=""):
+        print("ASK:", prompt.splitlines()[0][:60]); return "41234 482913"
+res = pp.pair_with_qr(OV2())
+print(res)
+assert "Connected to" in res and pc._state["serial"] == "192.168.137.223:46888", (res, pc._state["serial"])
+print("CODE PAIR OK")
+
+# ---- firewall cutting the connection -> clear help, no endless loop
+def adb5(args, **k):
+    if args[0] == "pair":
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="error: protocol fault (couldn't read status message): No error")
+    return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+pc.adb = adb5
+pc.restart_server = lambda: None
+res = pp.pair_with_qr(OV2())
+print(res[:90])
+assert "firewall" in res.lower()
+print("FIREWALL MESSAGE OK")
