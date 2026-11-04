@@ -1,215 +1,425 @@
 <div align="center">
 
-# 💜 Hinata X Helper
+<img src="docs/banner.svg" alt="Hinata X Helper - local AI assistant with a 3D hologram" width="100%">
 
-**A fast, voice-controlled AI assistant for your Windows PC *and* your Android phone, with a real-time 3D holographic HUD.**
+<br>
 
-Press a hotkey, say what you want, and it's done. Runs on a **local AI** (Ollama), so there's no API key, no cloud bill and no usage limits.
+[![Tests](https://github.com/dev-shubh-madara/hinata-x-jarvis/actions/workflows/tests.yml/badge.svg)](https://github.com/dev-shubh-madara/hinata-x-jarvis/actions/workflows/tests.yml)
+![Python](https://img.shields.io/badge/Python-3.10%2B-7a5cff?logo=python&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-5b8cff?logo=windows&logoColor=white)
+![Android](https://img.shields.io/badge/Android-11%2B-3ddc84?logo=android&logoColor=white)
+![Ollama](https://img.shields.io/badge/AI-Ollama%20(local)-111?logo=ollama&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-ff9ad5)
+[![Stars](https://img.shields.io/github/stars/dev-shubh-madara/hinata-x-jarvis?style=social)](https://github.com/dev-shubh-madara/hinata-x-jarvis/stargazers)
 
-`Python` · `Ollama` · `ADB` · `NumPy 3D renderer` · `Neural female voice` · `MIT`
+### Press a hotkey. Say what you want. It's done. On your PC *and* your phone.
 
-<img src="docs/hologram.png" width="420" alt="Hinata's 3D hologram">
+**Hinata** is a voice assistant in the spirit of JARVIS and FRIDAY. She runs on a **local AI**, so there's no API key, no cloud bill and no usage limit. She controls your Windows PC and your Android phone, looks at your screen, makes phone calls for you, and lives inside a real-time 3D hologram.
+
+[**Quick start**](#-quick-start) · [**What she can do**](#-what-she-can-do) · [**Phone**](#-phone-control) · [**AI calls**](#-ai-phone-calls) · [**How it works**](#-how-it-works) · [**Config**](#%EF%B8%8F-configuration)
+
+<br>
+
+<img src="docs/hologram.gif" alt="Hinata's real-time 3D hologram" width="340">
+
+<sub><i>The hologram above was recorded from Hinata's own renderer. It's drawn live, frame by frame, with NumPy and Pillow, not a video.</i></sub>
 
 </div>
 
 ---
 
-## ✨ Features
+## 📑 Contents
 
-- **Do anything on the PC.** Open any app, file, folder or site. Type, press shortcuts, control windows, volume, brightness and media. Take screenshots, write documents and code, build PowerPoints, set timers, manage files, and change settings.
-- **A multi-step AI agent.** Ask *"open notepad and write a poem about rain"* or *"find my resume and move it to Downloads"*, and Hinata chains the steps herself.
-- **PowerShell for everything else.** If no built-in tool covers a request, she writes and runs a PowerShell command. Risky commands always ask you to say **"confirm"** first.
-- **Phone control with QR pairing.** Say *"pair to phone"* and scan the QR code. After that she can open apps, tap buttons by their on-screen text, type, swipe, call contacts by name, text, take screenshots, toggle Wi-Fi or Bluetooth, read the screen, and mirror it on your PC.
-- **A natural female voice.** It uses Microsoft neural voices (free, no key). If you're offline, it falls back to the built-in Windows voice.
-- **Fast.** Common commands skip the AI and run in under 0.3 seconds. The AI model is preloaded and kept warm, and apps and files are indexed in the background.
-- **A cinematic 3D HUD.** The hologram is rendered live every frame: a particle globe, orbit rings, a radar sweep and bloom glow. It sets its own resolution to keep the animation smooth on your PC. Captions show what you said, her reply, and the response time.
-- **Barge-in.** Press the hotkey while she's talking and she stops to listen.
-- **Typed commands.** `Ctrl+Shift+J` opens a command bar, which is useful in a quiet room or when you need maximum speed.
+- [Why Hinata](#-why-hinata)
+- [What she can do](#-what-she-can-do)
+- [Quick start](#-quick-start)
+- [Using Hinata](#%EF%B8%8F-using-hinata)
+- [Phone control](#-phone-control)
+- [AI phone calls](#-ai-phone-calls)
+- [How it works](#-how-it-works)
+- [Configuration](#%EF%B8%8F-configuration)
+- [Safety](#%EF%B8%8F-safety-built-in)
+- [Project structure](#%EF%B8%8F-project-structure)
+- [Tests and CI](#-tests--ci)
+- [Troubleshooting](#-troubleshooting)
+- [FAQ](#-faq)
+- [Roadmap](#%EF%B8%8F-roadmap)
+- [Contributing](#-contributing) · [Credits](#-credits) · [License](#-license)
 
-## ⚡ Speed
+---
 
-| Request type | Typical time* |
-|---|---|
-| Instant commands (open, close, play, volume, timer...) | **0.05 – 0.4 s** |
-| AI, single action (`qwen2.5:3b` on GPU) | **0.5 – 1.5 s** |
-| AI, multi-step task | about 1 – 1.5 s per step |
-| Speech recognition (Google) | about 0.6 – 1 s after you stop talking |
+## 💡 Why Hinata
 
-<sub>*These are measured from the end of your command to the start of the action. Actual speed depends on your GPU, the model and your internet connection. Use a small tool-calling model for the best speed.</sub>
+| | Hinata X Helper | Typical cloud assistant |
+|---|---|---|
+| **Brain** | Local LLM through Ollama, on your own GPU | A remote API |
+| **Cost** | Free, no API key | Paid tokens or a subscription |
+| **Privacy** | Commands and screenshots stay on your PC* | Sent to a server |
+| **PC control** | 39 tools plus PowerShell, with multi-step chaining | Limited or none |
+| **Phone control** | Full Android control over Wireless debugging | Usually none |
+| **Looks** | Live 3D hologram HUD | A chat box |
 
-## 🚀 Install
+<sub>*Speech-to-text (Google), the neural voice, weather and news use the internet. You can switch speech-to-text to offline Whisper.</sub>
 
-1. **Python 3.10+.** Install it from [python.org](https://python.org) and tick *"Add to PATH"*.
-2. **Ollama** (the local AI brain). Install it from [ollama.com](https://ollama.com), then run:
-   ```bash
-   ollama pull qwen2.5:3b
-   ```
-   On a stronger GPU, `qwen2.5:7b` is smarter.
-3. **Install the dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-   If PyAudio fails to install: `pip install pipwin && pipwin install pyaudio`
-4. **Run it:**
-   ```bash
-   python main.py
-   ```
-   You can also double-click `run.bat`.
+---
 
-The `keyboard` library needs global hotkeys. If the hotkeys don't respond, run the terminal as administrator.
+## ✨ What she can do
 
-## 🎙️ Use it
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🖥️ Your PC
+- Open **any** app, file, folder or website (found automatically)
+- Type, press shortcuts, snap, minimise and close windows
+- Volume, brightness, media keys, Windows settings pages
+- **Write** essays and code, and build styled **PowerPoints** with AI-written slides
+- Screenshots, timers and spoken reminders
+- File actions (deletes go to the Recycle Bin, after you confirm)
+- **PowerShell** for anything else, with a safety gate
+
+</td>
+<td width="50%" valign="top">
+
+### 📱 Your phone
+- Pair once with a **6-digit code** (or a QR code)
+- Open apps, **tap any button by its text**, type, swipe
+- **Call** and **SMS** contacts by name (after you confirm)
+- Wi-Fi, Bluetooth, data and brightness toggles, screenshots
+- Read the screen aloud, plus screen mirroring through scrcpy
+- **Order food** on Swiggy or Zomato, with a payment lock
+- Run any Android shell command (risky ones are confirmed)
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🧠 FRIDAY-style powers
+- **Screen vision:** *"What is this video about?"*, *"How do I export this?"*
+- **AI phone calls:** she calls, talks, listens, hangs up and writes a transcript
+- **Live info:** where the ISS is right now, news headlines, cricket scores
+- **Conversation mode:** stays open while you chat, closes after real work
+- Calls you **"Boss"** (you can change this)
+
+</td>
+<td valign="top">
+
+### ⚡ Fast and smooth
+- Common commands skip the AI and run in **under 0.3 s**
+- Model preloaded and kept warm, with an app and file index built at startup
+- The hologram renders in **its own process**, so the window never stutters
+- **Adaptive resolution** that holds your target FPS
+- **Barge-in:** press the hotkey while she's talking and she stops to listen
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🚀 Quick start
+
+> **You need:** Windows 10 or 11, [Python 3.10+](https://python.org) (tick *"Add to PATH"*) and [Ollama](https://ollama.com).
+
+```bash
+# 1. get the code
+git clone https://github.com/dev-shubh-madara/hinata-x-jarvis.git
+cd hinata-x-jarvis
+
+# 2. the local AI brain (pick one)
+ollama pull qwen2.5:3b        # fast, works on most PCs
+ollama pull qwen2.5:7b        # smarter, needs a 6 GB+ GPU
+
+# 3. install and run
+setup_and_run.bat             # installs everything, then starts Hinata
+```
+
+After the first run, just use `run.bat`, or run `py -3 main.py` from the terminal.
+
+<details>
+<summary><b>Manual install / PyAudio problems</b></summary>
+
+```bash
+py -3 -m pip install -r requirements.txt
+py -3 main.py
+```
+If PyAudio won't install: `pip install pipwin && pipwin install pyaudio`.
+If the hotkeys don't respond, run the terminal **as administrator**. The `keyboard` library needs it on some PCs.
+</details>
+
+---
+
+## 🎙️ Using Hinata
 
 | Hotkey | Action |
 |---|---|
-| `Ctrl + Shift + H` | Speak a command |
-| `Ctrl + Shift + J` | Type a command |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd> | **Speak** a command |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>J</kbd> | **Type** a command (quiet room, or the fastest option) |
 | Right-click the orb | Quit |
 
-**Things to say:**
+**Speak naturally.** She waits about **2 seconds of silence** before acting, so long sentences and short pauses are fine.
 
-| Say | What happens |
+### Things to say
+
+| You say | What happens |
 |---|---|
-| "open vs code" / "open resume.pdf" / "open downloads" | Opens any app, file or folder (found automatically) |
-| "play believer by imagine dragons" | Starts playing it on YouTube |
-| "volume 30" / "brightness 70" / "mute" | Sets the volume, brightness or mute |
-| "open notepad and type hello world" | Multi-step: opens Notepad, then types |
-| "write an essay about AI" | Writes it, saves it and opens it |
-| "make a presentation about black holes" | Builds a styled .pptx with AI-written slides |
-| "remind me in 10 minutes to drink water" | Sets a spoken reminder with a toast |
-| "how's my laptop doing" | Reads out CPU, RAM, disk and the heaviest apps |
-| "what's my IP address" | Runs PowerShell through the agent |
-| "create a folder called projects on desktop" | Creates the folder |
-| "shut down" → "confirm" | Power actions always ask first |
-| **"pair to phone"** | Shows the QR code for phone pairing |
-| "on my phone open whatsapp" | Opens WhatsApp on the phone |
-| "on my phone tap Vishal" / "type hi" / "tap send" | Taps by on-screen text and types |
-| "call mom on my phone" → "confirm" | Calls the contact by name |
-| "on my phone text Mom saying I'm on my way" | Prepares the SMS; say "confirm" to send |
-| "show my phone screen" | Mirrors the phone on your PC (needs scrcpy) |
+| "open VS Code" · "open resume.pdf" · "open downloads" | Opens it (apps and files are found automatically) |
+| "play Believer by Imagine Dragons" | Plays it on YouTube |
+| "volume 30" · "brightness 70" · "mute" | Sets it instantly |
+| "open notepad and write a poem about rain" | Multi-step: opens Notepad, writes, types |
+| "make a presentation about black holes" | Builds a styled `.pptx` with AI-written slides |
+| "remind me in 10 minutes to drink water" | Spoken reminder plus a toast |
+| "how's my laptop doing?" | CPU, RAM, disk and the heaviest apps |
+| "what's my IP address?" | She writes and runs the PowerShell for it |
+| **"what is this video about?"** | Looks at your screen and answers |
+| **"where is the ISS right now?"** | Live position, plus the live map |
+| "latest news" · "news about ISRO" · "cricket score" | Live headlines and scores |
+| **"pair to phone"** | Connects your Android phone |
+| "on my phone open WhatsApp, tap Vishal, type hi" | Does it on the phone |
+| **"order chicken biryani on Swiggy"** | Gets to the cart and asks before paying |
+| **"call mom and tell her I'll be late today"** | Makes the call and does the talking |
+| "shut down" → **"confirm"** | Power actions always ask first |
 
-## 👂 Listening
+### 💬 Conversation mode
+- **Chatting** (questions, chit-chat, the time, the weather): the hologram **stays open** and keeps listening, with no hotkey between sentences.
+- **Real work** (open, make, play, pair, type…): she does it, answers in a few words, and the hologram **closes** so you can see the result.
+- **Close it any time:** say *"close"*, *"bas karo"*, *"that's all"* or *"okay Hinata, let's continue with our work"*. She also closes after 30 seconds of silence.
 
-Speak naturally. Hinata waits until you've been quiet for about **2 seconds** before she acts, so long sentences and short pauses are fine. Change this with `END_OF_SPEECH_PAUSE` in `config.py` (lower means snappier).
+---
 
-## 💬 Conversation mode
+## 📱 Phone control
 
-Hinata adapts to what you ask:
+Hinata uses Android's official **Wireless debugging**, the same mechanism Android Studio uses. No app to install and no cable needed.
 
-- **Just talking** (questions, chat, "what time is it", weather) - the hologram **stays open** and she keeps listening for your next sentence. No hotkey between sentences.
-- **Real work** ("open Chrome", "make a presentation", "play a song", "show the phone QR", "type this") - she does it, answers in a few words, and the hologram **closes** so you can see the result. Press the hotkey to bring her back.
-- **Asking you to confirm** (shut down, delete, call...) - stays open and waits for "confirm" or "cancel".
-- **To end a chat:** say *"Okay Hinata, let's continue with our work"* (or "that's all" / "bye Hinata"). She also closes by herself after 30 seconds of silence.
+**One-time phone setup:**
+1. **Settings → About phone →** tap **Build number** 7 times (this turns on Developer options).
+2. **Developer options →** turn on **Wireless debugging**.
+3. *Realme, Oppo or Xiaomi:* also turn on **Disable permission monitoring** or **USB debugging (Security settings)**.
 
-Turn it off with `CONVERSATION_MODE = False` in `config.py` (she then closes after every command). Tune the waiting time with `CONVO_IDLE_SECONDS`. If she ever hears her own voice, use headphones.
+**Pair (default: pairing code):**
+1. Say **"pair to phone"**.
+   On college or open Wi-Fi (which blocks devices from seeing each other), Hinata **turns on the laptop's own hotspot** and shows a Wi-Fi QR. Scan it with your camera to join.
+2. On the phone: **Wireless debugging → Pair device with pairing code**.
+3. Type the **port** and the **6-digit code** into Hinata's box, e.g. `41234 482913`. She pairs and connects on her own.
 
-## 🧠 FRIDAY-style powers
+After that, *"connect my phone"* reconnects without pairing again.
 
-| Say | What happens |
-|---|---|
-| "What is this video about?" / "How do I export this?" / "What does this error mean?" | She **looks at your screen** with a local vision model and answers. On first use she downloads `qwen2.5vl:3b` (~3 GB) automatically. |
-| "Where is the ISS right now?" | Live International Space Station position, spoken, with the live map opened |
-| "Latest news" / "News about ISRO" / "Cricket score" | Live headlines and scores |
-| "Order chicken biryani on Swiggy" | Opens Swiggy (or Zomato) on your phone, searches, picks a restaurant, adds it and goes to the cart. **She stops at the Pay / Place order button and tells you the total.** Only the word **"confirm"** pays; UPI PINs are always yours to type. |
-| "Call mom and tell her I'll be late today" | After you say "confirm", **she makes the call and does the talking**: *"Hello Mom, I'm Hinata, Shubh's AI assistant…"*. She listens, replies, hangs up, then pops up the transcript (saved in `Hinata_Output/Calls`). |
+<details>
+<summary><b>How the pairing works under the hood</b></summary>
 
-She calls you **"Boss"**. Change `USER_TITLE` and `USER_NAME` in `config.py`.
+- `hotspot.py` reads your current Wi-Fi with `netsh`. If it's open or a campus network, it starts **Windows Mobile Hotspot** through the WinRT tethering API.
+- `phone_pair.py` first tries mDNS discovery (`_adb-tls-pairing._tcp`). If the firewall hides it, Hinata takes the phone's IP from the hotspot's client list and **scans the phone's ports** to find the pairing and connect ports.
+- `adb pair` is retried after restarting the adb server (this fixes most `protocol fault` errors). A connection only counts once `adb get-state` says `device`.
+- `PAIR_METHOD = "qr"` switches to QR pairing instead.
+</details>
 
-### 📞 AI phone calls
-**Default: speakerphone mode (no setup, no Phone Link, no cable).** Hinata dials from your phone, turns on the phone's loudspeaker when they answer, listens with the laptop mic, and talks through the laptop speakers. Keep the phone next to the laptop in a quiet room.
+---
 
-**Optional, cleaner audio: Phone Link mode.** Set `CALL_AUDIO = "phonelink"` in `config.py`, then do this one-time setup:
-1. Install **Phone Link** on the laptop (it's built into Windows 11) and **Link to Windows** on the phone. Pair them and turn on **Calls** (it uses Bluetooth).
-2. Install the free **VB-Audio Virtual Cable** from vb-audio.com/Cable.
-3. In **Windows Sound settings → Recording**, right-click **CABLE Output** and choose **Set as Default Communication Device**. Phone Link uses this as its microphone, so Hinata's voice goes into the call.
-4. Run `pip install pyaudiowpatch miniaudio`.
+## 📞 AI phone calls
 
-The call is placed from your own phone, so your number shows. Without the cable it still works: she speaks through the laptop speakers and the mic picks her up, just less cleanly. For Hindi calls, set `CALL_LANGUAGE = "hi-IN"`.
+> *"Call mom and tell her I'll be late today."* → *"Confirm."*
 
-## 📱 Phone pairing
+Hinata dials from **your** phone, then says: *"Hello Mom, I'm Hinata, Shubh's AI assistant. Shubh is a bit busy, so he asked me to let you know that he will be late today."* She listens to the reply with speech recognition, answers with the local AI, says goodbye, hangs up, and **opens the transcript** (saved in `Desktop/Hinata_Output/Calls`).
 
-**Default: pairing code** (the most reliable method):
-1. Say **"pair to phone"**. On college or open Wi-Fi, Hinata turns on the laptop hotspot first. Scan that Wi-Fi QR with your camera.
-2. On the phone, go to **Developer options → Wireless debugging → Pair device with pairing code**.
-3. Type the **port** and the **6-digit code** into Hinata's box (e.g. `41234 482913`). She pairs and connects by herself.
+| Mode | Setup | Quality |
+|---|---|---|
+| `CALL_AUDIO = "phonelink"` (default) | Windows **Phone Link** with Calls turned on (Bluetooth) | ⭐⭐⭐ clean |
+| + VB-Audio Virtual Cable | Set **CABLE Output** as the *Default Communication Device* | ⭐⭐⭐⭐ studio-clean |
+| `CALL_AUDIO = "speakerphone"` | Nothing. The phone goes on loudspeaker next to the laptop | ⭐⭐ works anywhere |
 
-If it says the firewall is blocking it, allow `adb.exe` in McAfee or Windows Firewall. Set `PAIR_METHOD = "qr"` in `config.py` to use the QR method instead.
+She **always says she's an AI assistant**, and only calls after you say "confirm". For Hindi calls, set `CALL_LANGUAGE = "hi-IN"`.
 
-## 📱 Phone pairing (QR)
+---
 
-This uses Android's official **Wireless debugging**, the same QR pairing Android Studio uses.
+## 🧩 How it works
 
-1. Connect the phone and the PC to the **same Wi-Fi**.
-2. On the phone, go to **Settings → About phone** and tap **Build number** 7 times to enable Developer options.
-3. Go to **Settings → Developer options → Wireless debugging** and switch it on.
-4. Say **"pair to phone"**. A QR code appears on the PC.
-5. On the phone, tap **"Pair device with QR code"** and scan it. Done ✅
+```mermaid
+flowchart LR
+    K([Hotkey]) --> L[hotkey_listener<br/>mic + speech-to-text]
+    L --> S{session<br/>chat or work?}
+    S --> R[commands<br/>router]
+    R -->|confirm / cancel| C[(pending<br/>actions)]
+    R -->|instant patterns| P[pc_actions<br/>&lt; 0.3 s]
+    R -->|phone| A[phone_control<br/>ADB]
+    R -->|screen| V[vision<br/>local VLM]
+    R -->|calls| CA[call_agent]
+    R -->|everything else| N[nlu<br/>Ollama agent · 39 tools]
+    N --> P & A & V & CA
+    R --> T[tts_engine<br/>neural voice]
+    S --> O[overlay + hud3d<br/>3D hologram]
+    O -. shared memory .- H[hud_proc<br/>render process]
+```
 
-From then on, Hinata reconnects automatically whenever Wireless debugging is on. Requirements: Android 11+, plus Google's `adb` tool, which is **downloaded automatically** if it's missing. For screen mirroring, install scrcpy with `winget install Genymobile.scrcpy`.
+**The request pipeline, in order:**
+1. Pending **confirm or cancel** (power, delete, calls, payments)
+2. **Phone pairing** → `phone_pair` + `hotspot`
+3. **AI calls** → `call_agent`
+4. **Screen vision and live info** → `vision`, `live_info`
+5. **Phone commands** → `phone_control`
+6. **Instant patterns** (no AI, under 0.3 s) → `pc_actions`
+7. **Local AI agent** → `nlu` (tool calling, multi-step, with a JSON fallback for models without tools)
 
-> If the QR scan isn't found (some routers block discovery), click **"Use pairing code instead"** on the QR panel.
->
-> Some phones (Xiaomi, Realme, Oppo) also need **"USB debugging (Security settings)"** turned on in Developer options before taps and typing will work.
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
 
 ## ⚙️ Configuration
 
-Everything is in **`config.py`**:
+Everything lives in **[`config.py`](config.py)**. The settings you're most likely to change:
 
-- `ASSISTANT_NAME`, `USER_NAME`
-- `HOTKEY`, `TYPE_HOTKEY`
-- `NEURAL_VOICE`: try `en-US-AriaNeural`, `en-GB-SoniaNeural` or `hi-IN-SwaraNeural`
-- `STT_ENGINE`: `"google"` (default) or `"whisper"` for fully offline speech recognition on your GPU (`pip install faster-whisper`)
-- `OLLAMA_MODEL`: a specific model, or leave it blank to pick one automatically
-- `HUD_QUALITY`: `auto` / `ultra` / `high` / `medium` / `low`, plus `HUD_TARGET_FPS`
-- `AUTO_RUN_SAFE_COMMANDS`: set it to `False` to confirm **every** PowerShell command
+| Setting | Default | What it does |
+|---|---|---|
+| `USER_NAME` / `USER_TITLE` | `"Shubh"` / `"Boss"` | Your name, and what she calls you |
+| `HOTKEY` / `TYPE_HOTKEY` | `ctrl+shift+h` / `ctrl+shift+j` | Avoid Alt+Space, because Windows opens a window menu |
+| `END_OF_SPEECH_PAUSE` | `2.2` | Seconds of silence before she acts |
+| `NEURAL_VOICE` | `en-IN-NeerjaNeural` | Try `en-US-AriaNeural` or `hi-IN-SwaraNeural` |
+| `STT_ENGINE` | `"google"` | `"whisper"` for offline speech on your GPU |
+| `OLLAMA_MODEL` | `""` (auto) | Any model from `ollama list` |
+| `VISION_MODEL` | `qwen2.5vl:3b` | Downloaded automatically the first time you ask |
+| `CONVERSATION_MODE` | `True` | `False` closes after every command |
+| `PAIR_METHOD` | `"code"` | `"qr"` for QR pairing |
+| `CALL_AUDIO` | `"phonelink"` | or `"speakerphone"` |
+| `HUD_QUALITY` / `HUD_TARGET_FPS` | `auto` / `50` | `ultra` · `high` · `medium` · `low` |
+| `AUTO_RUN_SAFE_COMMANDS` | `True` | `False` confirms **every** PowerShell command |
 
-## 🛡️ Safety
+---
 
-- Hinata only acts after you press the hotkey. She never listens in the background.
-- Shut down, restart, sign out, deleting files (they go to the Recycle Bin), calls, SMS, and any PowerShell that deletes, installs, downloads or changes system settings all need a spoken **"confirm"** within 25 seconds.
-- Everything runs locally. The only internet use is Google speech recognition, the neural voice, weather, and YouTube search.
+## 🛡️ Safety (built in)
+
+- 🎧 She listens **only after you press the hotkey**. Nothing runs in the background.
+- ✅ Shut down, restart, deletes (to the Recycle Bin), calls, SMS and any risky PowerShell **need a spoken "confirm"** within 25 seconds.
+- 💳 **Payment lock:** buttons like *Pay* and *Place order* are detected on the phone screen and blocked until you say **"confirm"**. "Yes" is not enough. UPI PINs and lock-screen PINs are **never** typed.
+- 📞 AI calls always introduce themselves as an **AI assistant**.
+- 🧱 Risky Android shell commands (uninstall, wipe, reboot, `rm`…) are confirmed too.
+
+---
 
 ## 🗂️ Project structure
 
 ```
-main.py             app loop: hotkeys → listen → act → speak
-config.py           every setting
-commands.py         router: confirmations, instant patterns, phone routing, AI fallback
-nlu.py              local AI agent (Ollama tool calling, multi-step)
-pc_actions.py       everything it can do on Windows (+ PowerShell safety gate)
-phone_pair.py       QR pairing + auto-reconnect (ADB Wireless debugging, mDNS)
-phone_control.py    phone actions over ADB (tap-by-text, type, call, SMS...)
-tts_engine.py       female neural voice + cache + barge-in
-hotkey_listener.py  global hotkeys + speech-to-text (Google / faster-whisper)
-overlay.py          orb, full-screen HUD, captions, command bar, QR panel
-hud3d.py            real-time 3D hologram renderer (NumPy + Pillow)
-system_info.py      app/file index, battery, stats, weather
-web_answer.py       keyless answers when the AI is offline
+hinata-x-jarvis/
+├── main.py            # starts everything: log, HUD, warm-up, voice loop
+├── config.py          # every setting
+├── hotkey_listener.py # global hotkeys, mic, speech-to-text
+├── session.py         # conversation mode (chat vs work)
+├── commands.py        # the router: confirms, fast paths, phone, AI fallback
+├── nlu.py             # local Ollama agent - 39 tools, multi-step
+├── pc_actions.py      # everything on Windows + PowerShell safety gate
+├── phone_control.py   # Android over ADB: tap by text, type, call, SMS, food, payment lock
+├── phone_pair.py      # pairing code / QR, port-scan fallback, auto-reconnect
+├── hotspot.py         # Wi-Fi detection + Windows Mobile Hotspot
+├── call_agent.py      # AI phone calls + transcripts
+├── vision.py          # screenshot + local vision model
+├── live_info.py       # ISS, news, cricket
+├── overlay.py         # orb, full-screen HUD, captions, command bar, QR panel
+├── hud3d.py           # real-time 3D hologram renderer (NumPy + Pillow)
+├── hud_proc.py        # renderer process + shared-memory triple buffer
+├── tts_engine.py      # neural voice, cache, barge-in
+├── system_info.py     # app/file index, battery, stats, weather
+├── web_answer.py      # keyless answers when the AI is offline
+├── tests/             # headless test suite (fake PC, phone and AI)
+└── docs/              # architecture, banner, hologram
 ```
 
-## 🧪 Tests
+---
+
+## 🧪 Tests & CI
 
 ```bash
 python tests/run_all.py
 ```
 
-The tests run headless, with a fake phone, PC and AI, so they work without Windows or Ollama. They cover the command router, conversation mode, the AI agent loop, QR pairing, AI calls and the payment lock. CI runs them on every push. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how the pieces fit together.
+The tests run **headless, with a fake PC, phone and AI**, so they work on Linux or in CI without Windows or Ollama. They cover:
+
+- **Commands:** the instant command patterns and conversation-mode end phrases
+- **AI agent:** the multi-step agent loop with phone tools
+- **Pairing:** pairing code, QR, the college Wi-Fi hotspot flow, mDNS being blocked, and retry after a `protocol fault`
+- **AI calls:** a full scripted call conversation
+- **New features:** screen-vision routing, call parsing, and the **payment lock**
+
+GitHub Actions runs them on every push.
+
+---
 
 ## 🧰 Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| "AI brain offline" | Open the Ollama app, then check with `ollama list` and `python nlu.py` |
-| Hotkey does nothing | Run the terminal as administrator, or change `HOTKEY` |
-| Robotic voice | The neural voice needs internet; the robotic voice is the offline fallback |
-| Phone not found after scanning | Check that both devices are on the same Wi-Fi, scan from Wireless debugging (not the camera), or use the pairing code |
-| Taps or typing on the phone do nothing | Turn on "USB debugging (Security settings)" (Xiaomi/Realme/Oppo) |
-| HUD is laggy | Set `HUD_QUALITY = "medium"` or lower `HUD_TARGET_FPS` |
+| "AI brain offline" | Open the Ollama app, then check with `ollama list` |
+| Hotkey does nothing | Run the terminal as admin, or change `HOTKEY` |
+| A menu pops up when you press the hotkey | Don't use Alt+Space-style hotkeys (Windows window menu). The default is Ctrl+Shift+H |
+| She cuts you off mid-sentence | Raise `END_OF_SPEECH_PAUSE` to `2.5` or `3` |
+| She hears nothing | Restart her in a quiet moment (she calibrates the mic at startup) |
+| Phone: `protocol fault` while pairing | Your firewall (McAfee, Windows) is cutting adb. Allow `…\HinataXHelper\platform-tools\adb.exe` |
+| Phone not found on college Wi-Fi | Let Hinata start the laptop hotspot and join it from the phone |
+| Taps or typing on the phone do nothing | Realme, Oppo, Xiaomi: turn on *Disable permission monitoring* / *USB debugging (Security settings)* |
+| Robotic voice | The neural voice needs internet; the robotic one is the offline fallback |
+| Hologram is laggy | Plug in the charger and use the Performance power mode, pause any live wallpaper, or set `HUD_QUALITY = "medium"` |
+| Screen vision is slow the first time | The vision model is loading into the GPU; later answers are faster |
+
+---
+
+## ❓ FAQ
+
+<details><summary><b>Does it work without internet?</b></summary>
+The AI brain, PC control and phone control all work offline. For speech, set <code>STT_ENGINE = "whisper"</code> (<code>pip install faster-whisper</code>). The voice falls back to the built-in Windows voice.
+</details>
+
+<details><summary><b>Which model should I use?</b></summary>
+<code>qwen2.5:3b</code> for speed, <code>qwen2.5:7b</code> for smarts (6 GB+ GPU). Any model with tool calling works, and models without tools fall back to JSON actions.
+</details>
+
+<details><summary><b>Is my data sent anywhere?</b></summary>
+Commands are understood by your local model. Screenshots for vision go to your local vision model. Only speech-to-text (Google, unless you use Whisper), the neural voice and live info use the internet.
+</details>
+
+<details><summary><b>Can she pay for things on her own?</b></summary>
+No. She stops at any pay or place-order button and waits for you to say "confirm". UPI PINs are always yours to enter.
+</details>
+
+<details><summary><b>Linux or macOS?</b></summary>
+PC control targets Windows today. The tests already run on Linux, and ports are welcome (see Contributing).
+</details>
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] Wake word ("Hey Hinata") as an optional alternative to the hotkey
+- [ ] Memory of preferences across sessions
+- [ ] Plugin system for community tools
+- [ ] Linux and macOS PC-control backends
+- [ ] More HUD themes
+- [ ] Hindi-first conversation mode
+
+---
 
 ## 🤝 Contributing
 
-PRs are welcome: new tools (add them in `nlu.py` → `TOOLS` and `commands.py` → `_execute`), new HUD themes, Linux/macOS support, and translations.
+PRs are welcome!
+- **New tool:** add it to `nlu.py → TOOLS` and `commands.py → _execute`, then add a test in `tests/`.
+- **New phone action:** `phone_control.py`
+- **New HUD theme:** palettes in `hud3d.py`
+
+Run `python tests/run_all.py` before you open a PR.
+
+---
+
+## 🙏 Credits
+
+[Ollama](https://ollama.com) · [edge-tts](https://github.com/rany2/edge-tts) · [SpeechRecognition](https://github.com/Uberi/speech_recognition) · [Android platform-tools](https://developer.android.com/tools/releases/platform-tools) · [scrcpy](https://github.com/Genymobile/scrcpy) · [python-zeroconf](https://github.com/python-zeroconf/python-zeroconf) · [PyAudioWPatch](https://github.com/s0d3s/PyAudioWPatch) · NumPy · Pillow
+
+---
 
 ## 📄 License
 
-MIT © 2026 **Shubh** ([@dev-shubh-madara](https://github.com/dev-shubh-madara)). If you like it, give it a ⭐!
+[MIT](LICENSE) © 2026 **Shubh** ([@dev-shubh-madara](https://github.com/dev-shubh-madara))
+
+<div align="center">
+
+**If Hinata helped you, please give the repo a ⭐. It really helps!**
+
+<sub>Built with 💜 by Shubh · Madara</sub>
+
+</div>
