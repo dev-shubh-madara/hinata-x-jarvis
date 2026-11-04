@@ -126,6 +126,15 @@ She calls you **"Boss"**. Change `USER_TITLE` and `USER_NAME` in `config.py`.
 
 The call is placed from your own phone, so your number shows. Without the cable it still works: she speaks through the laptop speakers and the mic picks her up, just less cleanly. For Hindi calls, set `CALL_LANGUAGE = "hi-IN"`.
 
+## 📱 Phone pairing
+
+**Default: pairing code** (the most reliable method):
+1. Say **"pair to phone"**. On college or open Wi-Fi, Hinata turns on the laptop hotspot first. Scan that Wi-Fi QR with your camera.
+2. On the phone, go to **Developer options → Wireless debugging → Pair device with pairing code**.
+3. Type the **port** and the **6-digit code** into Hinata's box (e.g. `41234 482913`). She pairs and connects by herself.
+
+If it says the firewall is blocking it, allow `adb.exe` in McAfee or Windows Firewall. Set `PAIR_METHOD = "qr"` in `config.py` to use the QR method instead.
+
 ## 📱 Phone pairing (QR)
 
 This uses Android's official **Wireless debugging**, the same QR pairing Android Studio uses.
