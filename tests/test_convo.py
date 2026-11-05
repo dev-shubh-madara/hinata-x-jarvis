@@ -114,3 +114,22 @@ print("conversation_mode=False ->", why, "(closes after the first reply)"); asse
 why, sp, log = run(["how are you", "tell me more", None], typed=True)
 print("typed chat then Esc     ->", why, "| expanded only after first text:", log[:3])
 print("\nALL PASSED" if not bad else f"\n{bad} FAILED")
+
+# ---- right-click on the hologram = sleep back to the orb (Hinata keeps running)
+class SleepyOverlay(FakeOverlay):
+    def __init__(self):
+        super().__init__(); self.asleep = False
+    def consume_sleep(self):
+        if self.asleep:
+            self.asleep = False
+            return True
+        return False
+sov = SleepyOverlay()
+def listen_then_sleep(timeout):
+    sov.asleep = True          # user right-clicks while she is listening
+    return "what's the time"
+why = session.run_session(overlay=sov, typed=False, listen=listen_then_sleep, ask_command=lambda: None,
+                          run_command=lambda t: "chat", speak=lambda t: None)
+print("right-click while listening ->", why)
+assert why == "sleep", why
+print("SLEEP OK")
