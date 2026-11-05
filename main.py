@@ -95,7 +95,8 @@ def _run(overlay, text: str):
     if not nlu.available():
         _brain_status(overlay)
     reply = commands.handle(text)
-    outcome = commands.last_outcome()          # 'chat' | 'confirm' | 'action'
+    outcome = commands.last_outcome()
+    overlay.set_info("AI", (nlu.model_name() or "").upper()[:18] or "OFFLINE")   # live model name          # 'chat' | 'confirm' | 'action'
     ms = (time.perf_counter() - t0) * 1000
     print(f"[time] {ms:.0f} ms  ->  {outcome}")
     if outcome == "action":
