@@ -484,26 +484,47 @@ def _parse_code_input(text: str, phone_ip: str):
     return ip, port, code
 
 
+def _clean_form(ip_text: str, port_text: str, code_text: str):
+    """Forgiving: '192.168.137.5:41234' in the IP box, '482 913' as the code, extra spaces... all fine."""
+    ip, port = "", 0
+    m = re.search(r"(\d+\.\d+\.\d+\.\d+)(?:\s*:\s*(\d{2,5}))?", ip_text or "")
+    if m:
+        ip = m.group(1)
+        port = int(m.group(2)) if m.group(2) else 0
+    p = re.sub(r"\D", "", port_text or "")
+    m2 = re.search(r":\s*(\d{2,5})", port_text or "")       # someone typed ip:port in the port box
+    if m2:
+        p = m2.group(1)
+    if p and 1 <= int(p) <= 65535:
+        port = int(p)
+    code = re.sub(r"\D", "", code_text or "")
+    return ip, port, code
+
+
 def _pair_with_code(overlay, phone_ip: str = "", net_name: str = "") -> str:
     """Pairing with the 6-digit Wi-Fi pairing code (works even where QR discovery is blocked)."""
-    where = f" (the phone must be on the Wi-Fi '{net_name}')" if net_name else ""
-    ask_ip = "" if phone_ip else "the IP address:port and "
-    text = overlay.ask_text(
-        f"On your phone{where}:\nSettings > Developer options > Wireless debugging > "
-        "'Pair device with pairing code'.\n\n"
-        f"Type {ask_ip}the port and the 6-digit code shown there.\n"
-        f"Example:  {'192.168.137.5:41234 ' if not phone_ip else '41234 '}482913",
-        title="Pair with code")
-    if not text:
-        return "Okay, cancelled phone pairing."
-    ip, port, code = _parse_code_input(text, phone_ip)
-    if not ip:
-        more = overlay.ask_text("Now type the IP address shown on the phone (e.g. 192.168.137.5):",
-                                title="Pair with code")
-        ip = (more or "").strip()
-    if not (ip and port and code):
-        return ("I need the IP, the port and the 6-digit code from the 'Pair device with pairing code' "
-                "screen. Say 'pair to phone' to try again.")
+    where = f"  (phone on Wi-Fi '{net_name}')" if net_name else ""
+    prompt = ("On your phone" + where + ":\nDeveloper options > Wireless debugging > "
+              "'Pair device with pairing code'.\n\nCopy the numbers from that popup into the boxes below.")
+    ip = port = code = None
+    for attempt in range(3):
+        vals = overlay.ask_fields(prompt, [
+            ("IP address", ip or phone_ip, ""),
+            ("Port", str(port) if port else "", "the number after ':'"),
+            ("Pairing code", "", "6 digits")], title="Pair with code")
+        if not vals:
+            return "Okay, cancelled phone pairing."
+        ip, port, code = _clean_form(*vals)
+        missing = [n for n, ok in (("IP address", ip), ("port", port), ("6-digit pairing code", len(code) == 6))
+                   if not ok]
+        print(f"[pair] form -> ip={ip or '?'} port={port or '?'} code={'ok' if len(code) == 6 else len(code)}")
+        if not missing:
+            break
+        prompt = ("Missing or wrong: " + ", ".join(missing) + ".\n\nOn the phone's 'Pair with pairing code' "
+                  "popup: the top line is IP address:PORT (e.g. 192.168.137.223:41234) and the big "
+                  "number is the 6-digit code.")
+    else:
+        return "I still need the IP, port and 6-digit code. Say 'pair to phone' to try again."
     print(f"[pair] pairing code -> {ip}:{port}")
     ok, msg = _pair(ip, port, code, tries=2)
     if not ok:
