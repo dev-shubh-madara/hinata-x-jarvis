@@ -157,7 +157,7 @@ def ensure_connected() -> bool:
     if is_connected():
         return True
     import phone_pair
-    if phone_pair.auto_reconnect(wait=4):
+    if phone_pair.quick_reconnect() or phone_pair.auto_reconnect(wait=2, deep=False):
         return is_connected()
     return False
 

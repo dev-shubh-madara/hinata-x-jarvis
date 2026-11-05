@@ -128,7 +128,15 @@ def _connect(ip: str, port: int) -> bool:
     return False
 
 
-def auto_reconnect(wait: float = 5) -> bool:
+def quick_reconnect() -> bool:
+    """Fast path (about 1 s): reconnect to the last phone address we used."""
+    saved = _load()
+    if saved.get("ip") and saved.get("port"):
+        return _connect(saved["ip"], int(saved["port"]))
+    return False
+
+
+def auto_reconnect(wait: float = 5, deep: bool = True) -> bool:
     """Reconnects a previously paired phone (Wireless debugging must be on)."""
     if phone_control.adb_path() is None:
         return False
@@ -144,6 +152,8 @@ def auto_reconnect(wait: float = 5) -> bool:
             _save(saved)
             print(f"[phone] reconnected to {ip}:{port}")
             return True
+    if not deep:
+        return False                     # quick check only - the full scan runs on 'connect my phone'
     # mDNS blocked (firewall / hotspot): try the saved IP and nearby devices directly
     ips = [saved["ip"]] if saved.get("ip") else []
     ips += [ip for ip in _candidate_ips(bool(hotspot.client_ips())) if ip not in ips]
