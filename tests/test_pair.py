@@ -118,8 +118,9 @@ pc.connected_devices = lambda: [pc._state["serial"]] if pc._state["serial"] else
 pc.is_connected = lambda: bool(pc._state["serial"])
 pc._state["serial"] = None
 class OV2(OV):
-    def ask_text(self, prompt, title=""):
-        print("ASK:", prompt.splitlines()[0][:60]); return "41234 482913"
+    def ask_fields(self, prompt, fields, title=""):
+        print("FORM:", [f[0] for f in fields], "| IP prefilled:", fields[0][1])
+        return [fields[0][1], "41234", "482 913"]          # code typed with a space, as the phone shows it
 res = pp.pair_with_qr(OV2())
 print(res)
 assert "Connected to" in res and pc._state["serial"] == "192.168.137.223:46888", (res, pc._state["serial"])
@@ -136,3 +137,13 @@ res = pp.pair_with_qr(OV2())
 print(res[:90])
 assert "firewall" in res.lower()
 print("FIREWALL MESSAGE OK")
+
+
+# ---- form cleaning: whatever people type
+for vals, want in [(["192.168.137.223:41234", "", "482913"], ("192.168.137.223", 41234, "482913")),
+                   (["192.168.137.223", "41234", "482 913"], ("192.168.137.223", 41234, "482913")),
+                   (["192.168.137.223", "192.168.137.223:41234", "48-29-13"], ("192.168.137.223", 41234, "482913"))]:
+    got = pp._clean_form(*vals)
+    print("clean", vals, "->", got)
+    assert got == want, got
+print("FORM CLEAN OK")
