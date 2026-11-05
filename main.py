@@ -177,7 +177,24 @@ def _warm_up():
         print(f"[vision] {e}")
 
 
+_instance_lock = None
+
+
+def _already_running() -> bool:
+    """Only one Hinata at a time - autostart + a manual start would fight over the hotkeys."""
+    global _instance_lock
+    try:
+        k32 = ctypes.windll.kernel32
+        _instance_lock = k32.CreateMutexW(None, False, "Local\\HinataXHelper.SingleInstance")
+        return k32.GetLastError() == 183          # ERROR_ALREADY_EXISTS
+    except Exception:
+        return False
+
+
 def main():
+    if _already_running():
+        print("Hinata X Helper is already running - press Ctrl+Shift+H to talk to her.")
+        return
     _start_log()
     try:
         import hud_proc
