@@ -41,6 +41,8 @@ def run_session(*, overlay, typed, listen, ask_command, run_command, speak,
                 chime()
             text = listen(first_timeout if first else follow_timeout)
 
+        if getattr(overlay, "consume_sleep", lambda: False)():
+            return "sleep"                          # right-clicked the hologram: back to the orb
         if not text:
             if typed:
                 return "idle"                       # command bar closed with Esc
@@ -65,6 +67,8 @@ def run_session(*, overlay, typed, listen, ask_command, run_command, speak,
 
         outcome = run_command(text)                  # 'chat' | 'confirm' | 'action'
         drain()                                      # drop hotkey taps made while she talked
+        if getattr(overlay, "consume_sleep", lambda: False)():
+            return "sleep"
         if outcome == "action" or not conversation_mode:
             return "action"
 

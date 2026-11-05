@@ -125,7 +125,9 @@ class MicOverlay:
         self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<ButtonPress-1>", self._start_drag)
         self.canvas.bind("<B1-Motion>", self._on_drag)
-        self.canvas.bind("<ButtonPress-3>", lambda e: self.root.destroy())
+        self.canvas.bind("<ButtonPress-3>", self._on_right_click)
+        self.sleep_requested = threading.Event()      # right-click on the HUD = go back to the orb
+        self.on_quit = None
         self._drag_offset = (0, 0)
 
         self._current_state = "idle"
@@ -346,6 +348,51 @@ class MicOverlay:
     def collapse(self):
         self.root.after(0, self._do_collapse)
 
+    # ---- right-click: sleep, never quit by accident -------------------------------
+
+    def _on_right_click(self, event):
+        if self._hud_mode:
+            # big hologram -> back to the small orb; Hinata keeps running in the background
+            self.sleep_requested.set()
+            self._do_collapse()
+            try:
+                import tts_engine
+                tts_engine.stop()
+            except Exception:
+                pass
+            return
+        menu = tk.Menu(self.root, tearoff=0, bg=PANEL, fg=FG, activebackground=LAV,
+                       activeforeground="#000000", font=("Segoe UI", 10), bd=0)
+        menu.add_command(label="  Talk to Hinata   (Ctrl+Shift+H)", command=lambda: self._fire("voice"))
+        menu.add_command(label="  Type a command   (Ctrl+Shift+J)", command=lambda: self._fire("type"))
+        menu.add_separator()
+        menu.add_command(label="  Quit Hinata", command=self._confirm_quit)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _fire(self, kind):
+        try:
+            import hotkey_listener
+            hotkey_listener._fire(kind)
+        except Exception as e:
+            print(f"[overlay] menu action failed: {e}")
+
+    def _confirm_quit(self):
+        from tkinter import messagebox
+        if messagebox.askyesno("Hinata X Helper", "Quit Hinata completely?\n\n"
+                               "(She'll start again next time you log in.)", parent=self.root):
+            if self.on_quit:
+                self.on_quit()
+            self.root.destroy()
+
+    def consume_sleep(self) -> bool:
+        if self.sleep_requested.is_set():
+            self.sleep_requested.clear()
+            return True
+        return False
+
     def ghost(self, on: bool):
         """Makes Hinata invisible for a moment (so screenshots show YOUR screen, not her)."""
         alpha = 0.0 if on else (config.HUD_OPACITY if self._hud_mode else 1.0)
@@ -510,6 +557,7 @@ class MicOverlay:
         self._current_state = state
 
     def _do_expand(self):
+        self.sleep_requested.clear()
         now = self._now()
         if self._hud_mode:
             if self._phase == "outro":
