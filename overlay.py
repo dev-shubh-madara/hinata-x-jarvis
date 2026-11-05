@@ -355,6 +355,13 @@ class MicOverlay:
             # big hologram -> back to the small orb; Hinata keeps running in the background
             self.sleep_requested.set()
             self._do_collapse()
+            close = getattr(self, "_close_bar", None)
+            if close:
+                self._close_bar = None
+                try:
+                    close()
+                except Exception:
+                    pass
             try:
                 import tts_engine
                 tts_engine.stop()
@@ -463,6 +470,7 @@ class MicOverlay:
 
             entry.bind("<Return>", lambda e: finish(entry.get().strip() or None))
             entry.bind("<Escape>", lambda e: finish(None))
+            self._close_bar = lambda: finish(None)        # right-click on the hologram closes it too
             top.update_idletasks()
             w = top.winfo_reqwidth()
             top.geometry(f"+{(top.winfo_screenwidth() - w) // 2}+{int(top.winfo_screenheight() * 0.22)}")
