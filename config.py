@@ -25,7 +25,7 @@ HOTKEY = "ctrl+shift+h"       # press, then SPEAK a command (avoid Alt+Space: Wi
 TYPE_HOTKEY = "ctrl+shift+j"  # press, then TYPE a command (fastest - no speech step)
 LISTEN_TIMEOUT = 7             # seconds to wait for you to start speaking
 PHRASE_TIME_LIMIT = 30         # max seconds for one spoken command (long sentences are fine)
-END_OF_SPEECH_PAUSE = 2.2      # she waits this long after you stop talking before acting (2-3 s)
+END_OF_SPEECH_PAUSE = 1.5      # she waits this long after you stop talking before acting (raise to 2-3 if she cuts you off)
 SPEECH_LANGUAGE = "en-IN"      # "en-IN" Indian English, "hi-IN" Hindi, "en-US"...
 
 # Speech-to-text engine:
@@ -57,6 +57,7 @@ CHIME = True                          # short sound the moment the hotkey fires
 # ---- Local AI brain (Ollama) ----------------------------------------------------
 OLLAMA_HOST = ""               # blank = 127.0.0.1:11434
 OLLAMA_MODEL = ""              # exact name from "ollama list", or "" to auto-pick
+FAST_MODEL = "qwen2.5:3b"      # preferred when OLLAMA_MODEL is blank - downloaded once automatically; "" = off
                                # fast + smart picks: qwen2.5:3b, qwen2.5:7b, llama3.2:3b
 AGENT_MAX_STEPS = 6            # how many actions the AI may chain for one request
 AI_TEMPERATURE = 0.2

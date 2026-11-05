@@ -36,7 +36,7 @@ _state = {"checked_at": 0.0, "ok": False, "reason": "not checked yet", "model": 
           "tools": None, "start_tried_at": 0.0}
 RECHECK_SECONDS = 15
 KEEP_ALIVE = "60m"
-OPTIONS = {"temperature": config.AI_TEMPERATURE, "num_ctx": 4096, "num_predict": 700}
+OPTIONS = {"temperature": config.AI_TEMPERATURE, "num_ctx": 4096, "num_predict": 400}
 
 EMBED_HINTS = ("embed", "bge", "minilm", "e5-", "rerank", "nomic", "mxbai", "snowflake-arctic-embed", "clip")
 PREFERRED = ("qwen2.5", "qwen3", "llama3.2", "llama3.1", "llama3", "mistral-nemo", "mistral",
@@ -131,6 +131,11 @@ def _pick_model(names):
     chat = [n for n in names if not any(h in n.lower() for h in EMBED_HINTS)]
     if not chat:
         return None
+    fast = (getattr(config, "FAST_MODEL", "") or "").strip()
+    if fast:                                   # small + fast model = replies in about a second
+        for n in chat:
+            if n == fast or n.startswith(fast):
+                return n
     caps = {n: _capabilities(n) for n in chat}
     for family in PREFERRED:
         for n in chat:
@@ -177,6 +182,25 @@ def available(force: bool = False) -> bool:
     return True
 
 
+def _pull_fast_model():
+    """Downloads FAST_MODEL once in the background, then switches to it live."""
+    fast = (getattr(config, "FAST_MODEL", "") or "").strip()
+    if not fast or (config.OLLAMA_MODEL or "").strip():
+        return
+    try:
+        if any(n == fast or n.startswith(fast) for n in installed_models()):
+            return
+        print(f"[nlu] downloading the fast model {fast} (one time, ~2 GB) ...")
+        _post("/api/pull", {"model": fast, "stream": False}, timeout=(5, 3600))
+        print(f"[nlu] {fast} ready - switching to it")
+        _state["model"] = None
+        available(force=True)
+        _post("/api/generate", {"model": _state["model"], "prompt": "", "keep_alive": KEEP_ALIVE},
+              timeout=(5, 120))
+    except Exception as e:
+        print(f"[nlu] fast model download failed: {e}")
+
+
 def warm_up():
     """Loads the model into GPU/RAM now, so the first command isn't slow."""
     def run():
@@ -188,6 +212,7 @@ def warm_up():
             except Exception as e:
                 print(f"[nlu] warm-up failed: {e}")
     threading.Thread(target=run, daemon=True, name="ollama-warmup").start()
+    threading.Thread(target=_pull_fast_model, daemon=True, name="fast-model").start()
 
 
 def status_reason() -> str:
