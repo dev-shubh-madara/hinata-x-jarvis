@@ -84,9 +84,15 @@ def is_isolated(ssid: str, auth: str) -> bool:
 
 def start() -> dict:
     """Turns on Mobile hotspot. Returns {'ssid','password'} or {'error'}."""
-    r = _ps(_PS_START)
-    if r.get("SSID") and r.get("STATE", "").lower() == "on":
-        return {"ssid": r["SSID"], "password": r.get("PASS", "")}
+    import time
+    r = {}
+    for _ in range(4):                       # it can take a few seconds to switch on ("InTransition")
+        r = _ps(_PS_START)
+        if r.get("SSID") and r.get("STATE", "").lower() == "on":
+            return {"ssid": r["SSID"], "password": r.get("PASS", "")}
+        if "transition" not in (r.get("STATE", "") + r.get("ERR", "")).lower():
+            break
+        time.sleep(3)
     return {"error": r.get("ERR") or f"hotspot state {r.get('STATE', 'unknown')}"}
 
 
