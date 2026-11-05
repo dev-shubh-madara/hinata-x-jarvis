@@ -148,6 +148,11 @@ If PyAudio won't install: `pip install pipwin && pipwin install pyaudio`.
 If the hotkeys don't respond, run the terminal **as administrator**. The `keyboard` library needs it on some PCs.
 </details>
 
+### 🔁 Start with Windows
+
+Double-click **`install_autostart.bat`** once. From then on, Hinata starts by herself about 15 seconds after you log in, with no black window. Just press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>.
+Run `uninstall_autostart.bat` to turn it off. Only one Hinata can run at a time, so starting her by hand while she's already running does nothing.
+
 ---
 
 ## 🎙️ Using Hinata
