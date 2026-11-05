@@ -408,6 +408,57 @@ class MicOverlay:
         done.wait(1.0)
         time.sleep(0.12 if on else 0)
 
+    def ask_fields(self, prompt, fields, title="Hinata X Helper"):
+        """Themed form with several labelled boxes. BLOCKS the calling thread.
+        fields: [(label, default, hint)] -> list of strings, or None if cancelled."""
+        done, out = threading.Event(), {"v": None}
+
+        def build():
+            top = self._dialog(title)
+            tk.Label(top, text=prompt, bg=BG, fg=FG, font=("Segoe UI", 11), wraplength=460,
+                     justify="left").pack(padx=20, pady=(16, 8), anchor="w")
+            entries = []
+            for label, default, hint in fields:
+                row = tk.Frame(top, bg=BG)
+                row.pack(padx=20, pady=4, fill="x")
+                tk.Label(row, text=label, bg=BG, fg=LAV, font=("Segoe UI", 10, "bold"), width=14,
+                         anchor="w").pack(side="left")
+                e = tk.Entry(row, width=24, bg=FIELD, fg=FG, insertbackground=LAV_HI, relief="flat",
+                             font=(MONO, 15), highlightthickness=1, highlightbackground=LAV_DIM,
+                             highlightcolor=LAV)
+                e.pack(side="left", ipady=5, fill="x", expand=True)
+                if default:
+                    e.insert(0, default)
+                if hint:
+                    tk.Label(row, text=hint, bg=BG, fg=MUTED, font=("Segoe UI", 9)).pack(side="left", padx=8)
+                entries.append(e)
+
+            def finish(value):
+                out["v"] = value
+                try:
+                    top.destroy()
+                finally:
+                    done.set()
+
+            def submit(_e=None):
+                finish([e.get().strip() for e in entries])
+
+            btns = tk.Frame(top, bg=BG)
+            btns.pack(padx=20, pady=(12, 16), anchor="e")
+            self._button(btns, "Cancel", lambda: finish(None)).pack(side="right", padx=(8, 0))
+            self._button(btns, "Pair", submit, primary=True).pack(side="right")
+            for i, e in enumerate(entries):     # Enter jumps to the next box, then pairs
+                e.bind("<Return>", (lambda ev, j=i: entries[j + 1].focus_set()) if i < len(entries) - 1 else submit)
+            top.bind("<Escape>", lambda e: finish(None))
+            top.protocol("WM_DELETE_WINDOW", lambda: finish(None))
+            self._center(top)
+            first_empty = next((e for e in entries if not e.get()), entries[0])
+            top.after(30, lambda: self._force_focus(top, first_empty))
+
+        self.root.after(0, build)
+        done.wait(timeout=600)
+        return out["v"]
+
     def ask_text(self, prompt, title="Hinata X Helper"):
         """Themed text prompt. BLOCKS the calling thread. Returns text or None."""
         done, out = threading.Event(), {"v": None}
