@@ -118,7 +118,7 @@ def look(question: str, hide_overlay=None) -> str:
               "something in the app shown, give the exact clicks (menu names and where they are on screen).")
     try:
         r = nlu._post("/api/chat", {
-            "model": model, "stream": False, "keep_alive": "10m",
+            "model": model, "stream": False, "keep_alive": "2m",       # free the GPU again soon for the main model
             "messages": [{"role": "user", "content": prompt, "images": [img]}],
             "options": {"temperature": 0.2, "num_predict": 220, "num_ctx": 4096},
         }, timeout=(5, 120))
