@@ -161,9 +161,10 @@ Run `uninstall_autostart.bat` to turn it off. Only one Hinata can run at a time,
 |---|---|
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd> | **Speak** a command |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>J</kbd> | **Type** a command (quiet room, or the fastest option) |
-| Right-click the orb | Quit |
+| Right-click the **hologram** | Sends it back to the small orb (she keeps running) |
+| Right-click the **orb** | Menu: talk, type, or quit |
 
-**Speak naturally.** She waits about **2 seconds of silence** before acting, so long sentences and short pauses are fine.
+**Speak naturally.** She waits about **1.5 seconds of silence** before acting. If she cuts you off, raise `END_OF_SPEECH_PAUSE` in `config.py`.
 
 ### Things to say
 
@@ -277,7 +278,8 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 |---|---|---|
 | `USER_NAME` / `USER_TITLE` | `"Shubh"` / `"Boss"` | Your name, and what she calls you |
 | `HOTKEY` / `TYPE_HOTKEY` | `ctrl+shift+h` / `ctrl+shift+j` | Avoid Alt+Space, because Windows opens a window menu |
-| `END_OF_SPEECH_PAUSE` | `2.2` | Seconds of silence before she acts |
+| `END_OF_SPEECH_PAUSE` | `1.5` | Seconds of silence before she acts |
+| `FAST_MODEL` | `qwen2.5:3b` | Small, fast brain, downloaded once automatically (leaves GPU room for vision) |
 | `NEURAL_VOICE` | `en-IN-NeerjaNeural` | Try `en-US-AriaNeural` or `hi-IN-SwaraNeural` |
 | `STT_ENGINE` | `"google"` | `"whisper"` for offline speech on your GPU |
 | `OLLAMA_MODEL` | `""` (auto) | Any model from `ollama list` |
