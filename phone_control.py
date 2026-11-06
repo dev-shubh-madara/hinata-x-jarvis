@@ -113,7 +113,22 @@ def _download_platform_tools() -> str | None:
     return None
 
 
+def _link_up() -> bool:
+    try:
+        import link
+        return link.paired() and link.alive()
+    except Exception:
+        return False
+
+
 def adb(args: list[str], timeout: float = 15, serial: bool = True, binary: bool = False):
+    # Hinata Link (Termux + Shizuku on the phone) carries shell commands when it's up
+    if serial and args and args[0] in ("shell", "exec-out", "pull") and not _state.get("serial") \
+            and _link_up():
+        import link
+        res = link.adb_compat(args, timeout, binary)
+        if res is not None:
+            return res
     exe = adb_path()
     if not exe:
         return subprocess.CompletedProcess(args, 127, stdout=b"" if binary else "",
@@ -139,6 +154,9 @@ def connected_devices() -> list[str]:
 
 
 def is_connected() -> bool:
+    if _link_up():
+        _state["serial"] = None              # the link handles everything
+        return True
     devs = connected_devices()
     if not devs:
         _state["serial"] = None
@@ -152,18 +170,18 @@ def is_connected() -> bool:
 
 
 def ensure_connected() -> bool:
-    if adb_path() is None:
-        return False
     if is_connected():
         return True
+    if adb_path() is None:
+        return False
     import phone_pair
     if phone_pair.quick_reconnect() or phone_pair.auto_reconnect(wait=2, deep=False):
         return is_connected()
     return False
 
 
-NOT_CONNECTED = ("Your phone isn't connected. Say 'pair to phone' and scan the QR code, "
-                 "or turn on Wireless debugging if you've paired before.")
+NOT_CONNECTED = ("Your phone isn't connected. Say 'pair to phone' to set it up - or, if you already did, "
+                 "open Shizuku (press Start if needed) and Termux on the phone, then say 'connect my phone'.")
 
 
 # ---------------------------------------------------------------- full control
