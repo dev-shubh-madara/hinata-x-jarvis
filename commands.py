@@ -116,6 +116,29 @@ def _hide_hologram():
         time.sleep(0.5)
 
 
+def _open_firewall_settings():
+    """Opens McAfee if it's installed, otherwise Windows Security's firewall page."""
+    import os
+    for exe in (r"C:\Program Files\McAfee\WPS\McAfee.exe",
+                r"C:\Program Files\McAfee\MSC\mcuicnt.exe"):
+        if os.path.isfile(exe):
+            try:
+                os.startfile(exe)
+                return
+            except OSError:
+                pass
+    try:
+        res = pc.open_target("McAfee")
+        if res and "couldn't" not in res.lower() and "not find" not in res.lower():
+            return
+    except Exception:
+        pass
+    try:
+        os.startfile("windowsdefender://network/")
+    except OSError:
+        pass
+
+
 def _ghost_for_capture():
     if _overlay:
         _overlay.ghost(True)
@@ -421,6 +444,16 @@ def handle(text: str) -> str:
     r = _resolve_pending(t)
     if r is not None:
         return r
+
+    # ---- firewall: Hinata never changes security settings herself - she opens them for you
+    if re.search(r"\bfire ?wall\b|\bmcafee\b|\bantivirus\b", t):
+        _acted = True
+        _hide_hologram()
+        _open_firewall_settings()
+        adb = phone.adb_path() or "adb.exe"
+        return ("I won't switch off your firewall myself - that's your call. I've opened the firewall settings. "
+                "In McAfee: Firewall, then Internet connections for programs, Add, pick " + adb +
+                ", set it to Full access. Then say 'pair to phone' again.")
 
     # ---- phone pairing / connecting
     if re.search(r"\b(pair|pairing|re-?pair)\b|\bqr\b|\b(connect|link|attach|jod)\b.*\b(phone|mobile|android)\b", t) \
