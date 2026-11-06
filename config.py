@@ -119,7 +119,7 @@ KNOWN_SITES = {
 DEFAULT_CITY = ""              # blank = auto-detect from your internet connection
 
 # ---- Phone -----------------------------------------------------------------------------
-PAIR_METHOD = "code"           # "code" = 6-digit pairing code (most reliable)  |  "qr" = QR code
+PAIR_METHOD = "link"           # "link" = Hinata Link (Termux + Shizuku, no adb pairing) | "code" | "qr"
 PHONE_AUTO_RECONNECT = True    # reconnect a paired phone at startup if Wireless debugging is on
 SCRCPY_PATH = "scrcpy"         # for "show my phone screen" (optional, see README)
 

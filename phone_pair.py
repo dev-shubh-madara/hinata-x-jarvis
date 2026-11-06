@@ -219,12 +219,18 @@ STEPS = [
 def pair_with_qr(overlay) -> str:
     if overlay is None:
         return "I can't show the QR code right now - restart me and try again."
-    if phone_control.adb_path(download=True) is None:
+    method = str(getattr(config, "PAIR_METHOD", "link")).lower()
+    if method == "link":
+        import link
+        if link.paired() and link.alive():
+            return f"Your phone ({link.model()}) is already connected."
+    elif phone_control.adb_path(download=True) is None:
         return ("I need Google's adb tool and couldn't download it. Install Android "
                 "platform-tools and add it to PATH, then say 'pair to phone' again.")
-    phone_control.restart_server()               # clean adb = no stale 'protocol fault'
+    else:
+        phone_control.restart_server()           # clean adb = no stale 'protocol fault'
 
-    usb = phone_control.usb_device()
+    usb = phone_control.usb_device() if method != "link" else None
     if usb:                                     # cable plugged in - no QR needed
         phone_control._state["serial"] = usb
         phone_control._state["screen"] = None
@@ -251,7 +257,9 @@ def pair_with_qr(overlay) -> str:
             return joined
     blocked = None
 
-    if str(getattr(config, "PAIR_METHOD", "code")).lower() != "qr":
+    if method == "link":
+        return _pair_with_link(overlay, net_name, on_hotspot)
+    if method != "qr":
         phone_ip = (hotspot.client_ips() or [""])[0] if on_hotspot else ""
         return _pair_with_code(overlay, phone_ip=phone_ip, net_name=net_name)
 
@@ -437,6 +445,57 @@ def _finish_direct(ip: str, ports: list[int], panel) -> str:
             f"'on my phone open WhatsApp' or 'call Vishal on my phone'.")
 
 
+LINK_STEPS = [
+    "One-time setup on the phone:",
+    "1. Install  Shizuku  (Play Store)  and  Termux  (F-Droid or GitHub)",
+    "2. Shizuku: Start via Wireless debugging (it pairs the phone with itself)",
+    "3. Shizuku > 'Use Shizuku in terminal apps' > Export files > Documents/sh",
+    "4. Scan this QR with the camera, copy the text, paste it in Termux, press Enter",
+    "5. Tap Allow when Termux / Shizuku ask - I connect by myself",
+]
+
+
+def _pair_with_link(overlay, net_name: str, on_hotspot: bool) -> str:
+    """Hinata Link: the phone runs a small helper (Termux + Shizuku); no adb pairing at all."""
+    import link
+    key = link.new_key()
+    cmd = link.setup_command(key)
+    try:
+        img = make_qr(cmd)
+    except Exception as e:
+        return f"I couldn't draw the QR code ({e}). Run: pip install qrcode"
+    steps = LINK_STEPS + ([f"Phone must be on the Wi-Fi:  {net_name}"] if net_name else [])
+    panel = overlay.show_qr("CONNECT YOUR PHONE", img, steps,
+                            footer="Waiting for your phone...",
+                            subtitle="Hinata Link - works without wireless-debugging pairing",
+                            alt_label="Copy setup text")
+    print("[link] waiting for the phone helper (setup QR shown)")
+    try:
+        deadline = time.time() + 900                      # first setup installs Python: give it time
+        while time.time() < deadline and not panel.cancelled.is_set():
+            if panel.use_code.is_set():
+                panel.use_code.clear()
+                try:
+                    import pyperclip
+                    pyperclip.copy(cmd)
+                    panel.status("Copied - send it to your phone (WhatsApp / Phone Link) and paste in Termux")
+                except Exception:
+                    print(f"[link] setup command: {cmd}")
+                    panel.status("Copy failed - the setup text is in hinata.log")
+            if link.connect(key=key, quiet=True):
+                panel.status(f"Connected to {link.model()}!")
+                time.sleep(1.2)
+                print(f"[link] connected to {link.model()} at {link._state['ip']}")
+                return (f"Connected to {link.model()} through Hinata Link. Say 'on my phone' before any "
+                        "command, like 'on my phone open WhatsApp'.")
+            time.sleep(3)
+        if panel.cancelled.is_set():
+            return "Okay, cancelled phone setup."
+        return ("Your phone didn't connect yet. Finish the steps on the phone, then say 'connect my phone'.")
+    finally:
+        panel.close()
+
+
 def _service_name(net: str) -> str:
     """Pairing name shown on the phone = the laptop's current Wi-Fi name + a short code."""
     base = re.sub(r"[^A-Za-z0-9]+", "-", net or "HINATA").strip("-")[:24] or "HINATA"
@@ -553,6 +612,12 @@ def _pair_with_code(overlay, phone_ip: str = "", net_name: str = "") -> str:
 
 
 def connect_existing() -> str:
+    import link
+    if link.paired():
+        if link.alive() or link.connect():
+            return f"Connected to {link.model()}."
+        return ("I can't reach your phone. On the phone: be on the same Wi-Fi as the laptop (or its hotspot), "
+                "open Shizuku and press Start if needed, then open Termux. Then say 'connect my phone'.")
     if phone_control.adb_path() is None:
         return "Pair first - say 'pair to phone'."
     if phone_control.is_connected() or auto_reconnect(wait=6):

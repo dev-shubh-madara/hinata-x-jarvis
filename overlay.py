@@ -532,7 +532,7 @@ class MicOverlay:
         return out["v"]
 
     def show_qr(self, title, pil_image, steps, footer="",
-                subtitle="Scan with your phone to give Hinata control", code_button=True):
+                subtitle="Scan with your phone to give Hinata control", code_button=True, alt_label=None):
         """Non-blocking phone-pairing panel. Returns a handle with .status(),
         .close(), .cancelled and .use_code events."""
         panel = _QRPanel(self)
@@ -559,7 +559,9 @@ class MicOverlay:
             panel.status_lbl.pack(pady=(0, 8))
             row = tk.Frame(top, bg=BG)
             row.pack(pady=(2, 18))
-            if code_button:
+            if alt_label:
+                self._button(row, alt_label, panel.use_code.set).pack(side="left", padx=6)
+            elif code_button:
                 self._button(row, "Use pairing code instead", panel.use_code.set).pack(side="left", padx=6)
             else:
                 self._button(row, "Phone joined - next", panel.use_code.set).pack(side="left", padx=6)
