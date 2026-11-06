@@ -196,28 +196,31 @@ Run `uninstall_autostart.bat` to turn it off. Only one Hinata can run at a time,
 
 ## 📱 Phone control
 
-Hinata uses Android's official **Wireless debugging**, the same mechanism Android Studio uses. No app to install and no cable needed.
+### Hinata Link (default, no wireless-debugging pairing needed)
 
-**One-time phone setup:**
+Some laptops can't finish Android's wireless-debugging pairing. Mine kept failing with `protocol fault` because of the firewall. Hinata Link avoids that completely: the phone gives itself ADB rights through **Shizuku**, and a tiny helper in **Termux** takes Hinata's commands over the local network. Every request is signed with a secret key from the setup QR.
+
+**One-time setup:**
+1. Install **Shizuku** (Play Store) and **Termux** (F-Droid or GitHub, not the old Play Store build).
+2. In Shizuku, tap **Start via Wireless debugging**. It pairs the phone with *itself*, so no PC is involved.
+3. In Shizuku, open **Use Shizuku in terminal apps → Export files** and pick `Documents/sh`.
+4. Say **"pair to phone"** to Hinata. Scan the QR with your camera, copy the text, paste it into Termux and press Enter.
+5. Tap **Allow** when Termux or Shizuku ask. Hinata connects on her own.
+
+On college or open Wi-Fi, Hinata first turns on the laptop hotspot and shows a Wi-Fi QR for the phone.
+**After a phone restart:** open Shizuku → **Start**, then open Termux. Say *"connect my phone"* if she doesn't pick it up herself.
+
+### Classic ADB pairing
+
+Set `PAIR_METHOD = "code"` (6-digit pairing code) or `"qr"` in `config.py` to use Android's own wireless-debugging pairing instead.
+
+<details>
+<summary><b>Phone settings for the classic method</b></summary>
+
 1. **Settings → About phone →** tap **Build number** 7 times (this turns on Developer options).
 2. **Developer options →** turn on **Wireless debugging**.
 3. *Realme, Oppo or Xiaomi:* also turn on **Disable permission monitoring** or **USB debugging (Security settings)**.
-
-**Pair (default: pairing code):**
-1. Say **"pair to phone"**.
-   On college or open Wi-Fi (which blocks devices from seeing each other), Hinata **turns on the laptop's own hotspot** and shows a Wi-Fi QR. Scan it with your camera to join.
-2. On the phone: **Wireless debugging → Pair device with pairing code**.
-3. Type the **port** and the **6-digit code** into Hinata's box, e.g. `41234 482913`. She pairs and connects on her own.
-
-After that, *"connect my phone"* reconnects without pairing again.
-
-<details>
-<summary><b>How the pairing works under the hood</b></summary>
-
-- `hotspot.py` reads your current Wi-Fi with `netsh`. If it's open or a campus network, it starts **Windows Mobile Hotspot** through the WinRT tethering API.
-- `phone_pair.py` first tries mDNS discovery (`_adb-tls-pairing._tcp`). If the firewall hides it, Hinata takes the phone's IP from the hotspot's client list and **scans the phone's ports** to find the pairing and connect ports.
-- `adb pair` is retried after restarting the adb server (this fixes most `protocol fault` errors). A connection only counts once `adb get-state` says `device`.
-- `PAIR_METHOD = "qr"` switches to QR pairing instead.
+4. Say **"pair to phone"**, then on the phone open **Wireless debugging → Pair device with pairing code**, and type the port and code into Hinata's form.
 </details>
 
 ---
@@ -285,7 +288,7 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 | `OLLAMA_MODEL` | `""` (auto) | Any model from `ollama list` |
 | `VISION_MODEL` | `qwen2.5vl:3b` | Downloaded automatically the first time you ask |
 | `CONVERSATION_MODE` | `True` | `False` closes after every command |
-| `PAIR_METHOD` | `"code"` | `"qr"` for QR pairing |
+| `PAIR_METHOD` | `"link"` | `"code"` or `"qr"` for classic ADB pairing |
 | `CALL_AUDIO` | `"phonelink"` | or `"speakerphone"` |
 | `HUD_QUALITY` / `HUD_TARGET_FPS` | `auto` / `50` | `ultra` · `high` · `medium` · `low` |
 | `AUTO_RUN_SAFE_COMMANDS` | `True` | `False` confirms **every** PowerShell command |
@@ -314,7 +317,9 @@ hinata-x-jarvis/
 ├── nlu.py             # local Ollama agent - 39 tools, multi-step
 ├── pc_actions.py      # everything on Windows + PowerShell safety gate
 ├── phone_control.py   # Android over ADB: tap by text, type, call, SMS, food, payment lock
-├── phone_pair.py      # pairing code / QR, port-scan fallback, auto-reconnect
+├── phone_pair.py      # Hinata Link setup, pairing code / QR, auto-reconnect
+├── link.py            # Hinata Link client (signed TCP to the phone helper)
+├── phone/             # phone helper for Termux + Shizuku, one-line installer
 ├── hotspot.py         # Wi-Fi detection + Windows Mobile Hotspot
 ├── call_agent.py      # AI phone calls + transcripts
 ├── vision.py          # screenshot + local vision model
