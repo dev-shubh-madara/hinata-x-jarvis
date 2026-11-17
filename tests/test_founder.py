@@ -18,6 +18,9 @@ c._hide_hologram = lambda: None
 opened = []
 whatsapp._open_chat = lambda number, message="": opened.append((number, message))
 whatsapp.time.sleep = lambda s: None
+# never drive the real WhatsApp app from a test: these checks cover the phone-number path
+_real_send_by_name = whatsapp.send_by_name
+whatsapp.send_by_name = lambda who, message, auto_send=True: None
 
 # --- WhatsApp, confirm-first mode (WHATSAPP_AUTO_SEND = False): nothing goes out until "confirm"
 import config

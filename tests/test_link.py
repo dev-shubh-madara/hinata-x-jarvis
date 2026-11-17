@@ -14,7 +14,14 @@ home = tempfile.mkdtemp()
 os.makedirs(os.path.join(home, ".hinata"))
 with open(os.path.join(home, ".hinata", "link.json"), "w") as f:
     f.write('{"key": "test-key-123"}')
-env = dict(os.environ, HOME=home, HINATA_RISH="sh", HINATA_PORT=str(PORT))
+env = dict(os.environ, HOME=home, USERPROFILE=home, HINATA_RISH="sh", HINATA_PORT=str(PORT))
+
+# The phone helper runs in Termux on Android and needs a Unix shell. On a Windows
+# laptop without one there is nothing to run it with, so this end-to-end test is skipped.
+import shutil
+if not shutil.which("sh"):
+    print("SKIP  Hinata Link end-to-end needs a Unix shell (runs on the phone / Linux)")
+    sys.exit(0)
 
 
 def start_agent():
