@@ -595,7 +595,8 @@ def handle(text: str) -> str:
         _acted = True
         _hide_hologram()
         return motion.open_in_browser(motion.latest_id())
-    if re.search(r"\brender (?:the |my )?(?:motion )?(?:video|reel|animation)\b", t):
+    if re.search(r"\b(?:render|save|export|download) (?:the |my |this )?(?:motion )?(?:video|reel|animation)\b", t) and \
+            not _MY_VIDEO.search(t.replace("the video", "").replace("my video", "")):
         import motion
         _acted = True
         return motion.render_async(speak=_speak)

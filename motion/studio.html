@@ -96,7 +96,7 @@ video{max-width:100%;max-height:70vh;border-radius:8px;display:block;margin:auto
     <div class="ptitle"><div id="title">-</div><div id="sub">-</div></div>
     <div class="agents" id="agents" title="Agents"></div>
     <div class="brain" id="brain"></div>
-    <button class="primary" id="render">Render MP4</button>
+    <button class="primary" id="render">Save video</button>
   </header>
   <div class="progress"><i id="prog"></i></div>
   <main>
@@ -478,7 +478,7 @@ async function poll() {
       const r = st.render || {};
       $("prog").style.width = (r.state === "rendering" ? (r.progress || 0) * 100 : r.state === "done" ? 100 : 0) + "%";
       $("render").disabled = r.state === "rendering" || st.busy;
-      $("render").textContent = r.state === "rendering" ? `Rendering ${Math.round((r.progress || 0) * 100)}%` : "Render MP4";
+      $("render").textContent = r.state === "rendering" ? `Saving ${Math.round((r.progress || 0) * 100)}%` : "Save video";
       if (r.state === "done" && lastRenderState === "rendering") showVideo(r.video);
       lastRenderState = r.state;
       const p = await api.get("/api/project/" + pid);

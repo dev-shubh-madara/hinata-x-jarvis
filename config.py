@@ -81,6 +81,7 @@ DESK_AGENT_MAX_STEPS = 20
 STUDIO_PORT = 8740             # the studio runs on http://127.0.0.1:8740
 MOTION_SIZE = "vertical"       # "vertical" (1080x1920 reels) | "wide" (1920x1080) | "square"
 MOTION_FPS = 30
+MOTION_AUTO_SAVE = False       # False = preview in the studio only; the MP4 is saved when you say "save the video"
 
 # ---- Safety ------------------------------------------------------------------------
 # The AI can run PowerShell to do things no built-in tool covers.

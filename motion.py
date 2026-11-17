@@ -488,7 +488,9 @@ def edit(pid: str, instruction: str) -> str:
 
 # ---------------------------------------------------------------- the whole pipeline
 
-def make(brief: str, render_now: bool = True, open_studio: bool = True, speak=None) -> str:
+def make(brief: str, render_now: bool | None = None, open_studio: bool = True, speak=None) -> str:
+    if render_now is None:
+        render_now = bool(getattr(config, "MOTION_AUTO_SAVE", False))
     pid = _slug(brief[:40])
     start_server()
     _placeholder(pid, brief)
@@ -501,7 +503,8 @@ def make(brief: str, render_now: bool = True, open_studio: bool = True, speak=No
     if render_now:
         return (f"Your video is ready: {project.get('title', 'your video')}, {len(project.get('scenes', []))} scenes. "
                 f"It's saved in {_dir(pid)}.")
-    return f"The storyboard for {project.get('title', 'your video')} is in the studio."
+    return (f"{project.get('title', 'Your video')} is ready to watch in the studio. "
+            "I haven't saved the video file yet - say 'save the video' when you're happy with it.")
 
 
 def make_async(brief: str, speak=None) -> str:
@@ -528,14 +531,14 @@ def render_async(pid: str | None = None, speak=None) -> str:
     def run():
         try:
             path = render(pid)
-            _announce(f"The video is rendered. It's in {os.path.dirname(path)}.", speak)
+            _announce(f"The video is saved in {os.path.dirname(path)}.", speak)
         except Exception as e:
             log(pid, "Renderer", f"Stopped: {e}", "error")
             with _lock:
                 st["render"] = {"state": "error", "progress": 0, "error": str(e)}
             _announce(f"Rendering failed: {e}", speak)
     threading.Thread(target=run, daemon=True, name="motion-render").start()
-    return "Rendering now. I'll tell you when it's done."
+    return "Saving the video now. I'll tell you when it's done."
 
 
 # ---------------------------------------------------------------- studio server
@@ -633,7 +636,8 @@ class _Handler(BaseHTTPRequestHandler):
             if not brief:
                 return self._send(400, {"error": "brief needed"})
             pid = _slug(brief[:40])
-            threading.Thread(target=_make_with_id, args=(pid, brief), daemon=True).start()
+            threading.Thread(target=_make_with_id, args=(pid, brief, bool(getattr(config, "MOTION_AUTO_SAVE", False))),
+                             daemon=True).start()
             return self._send(200, {"id": pid})
         if parts[:2] == ["api", "edit"] and len(parts) == 3:
             threading.Thread(target=edit, args=(parts[2], str(body.get("text") or "")), daemon=True).start()
@@ -661,7 +665,7 @@ def _placeholder(pid, brief):
         {"type": "statement", "headline": "Your agents are [working]", "mascot": "bot", "mood": "think", "duration": 3}]}))
 
 
-def _make_with_id(pid, brief, render_now=True, placeholder=True):
+def _make_with_id(pid, brief, render_now=False, placeholder=True):
     """Runs the whole agent team. Returns None when fine, else the error text."""
     st = status(pid)
     with _lock:
