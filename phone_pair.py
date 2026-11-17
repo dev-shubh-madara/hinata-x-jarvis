@@ -169,7 +169,24 @@ def auto_reconnect(wait: float = 5, deep: bool = True) -> bool:
     return False
 
 
+def _keep_link_alive():
+    """Hinata Link stays connected by itself: checks every 30 s and reconnects when the phone is back."""
+    import link
+    was = None
+    while True:
+        try:
+            up = link.paired() and link.alive()
+            if up != was and link.paired():
+                print(f"[link] phone {'connected: ' + link.model() if up else 'not reachable - will keep trying'}")
+                was = up
+        except Exception as e:
+            print(f"[link] keep-alive: {e}")
+        time.sleep(30)
+
+
 def auto_reconnect_background():
+    if config.PHONE_AUTO_RECONNECT:
+        threading.Thread(target=_keep_link_alive, daemon=True, name="link-keepalive").start()
     if config.PHONE_AUTO_RECONNECT and _load():
         threading.Thread(target=auto_reconnect, kwargs={"wait": 6},
                          daemon=True, name="phone-reconnect").start()

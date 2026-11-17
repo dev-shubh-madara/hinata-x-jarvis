@@ -26,7 +26,7 @@ F_BUILD, F_DISSOLVE, F_T0, F_MS, F_FPS = range(5)
 N_INT, N_FLT = 16, 8
 HEADER = N_INT * 8 + N_FLT * 8
 STATES = ["listening", "thinking", "speaking", "rejected", "idle"]
-MIN_PX = 480
+MIN_PX = 400
 
 
 def layout(shm, max_t):

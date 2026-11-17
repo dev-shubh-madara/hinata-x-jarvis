@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Hinata Motion</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static/runtime.css">
+<style>
+:root{--bg:#0d0f14;--panel:#141821;--panel2:#1a1f2b;--line:#252b39;--tx:#e8ecf4;--mut:#8a93a8;--acc:#c6f432;--acc2:#7b5cff;--warn:#ffb547;--err:#ff6b6b}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:13px/1.4 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:#3a4256}button.primary{background:var(--acc);color:#111;border-color:var(--acc);font-weight:700}
+button:disabled{opacity:.5;cursor:default}
+.app{display:grid;grid-template-rows:48px 3px minmax(0,1fr) 190px;height:100vh}
+header{display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:#0b0d12}
+.logo{font-weight:800;letter-spacing:.02em;display:flex;align-items:center;gap:8px}.logo b{width:12px;height:12px;border-radius:3px;background:var(--acc)}
+.logo span{color:var(--mut);font-weight:500}
+.menu{display:flex;gap:4px}.menu button{background:none;border:none;color:var(--mut);padding:6px 8px}.menu button:hover{color:var(--tx)}
+.ptitle{flex:1;text-align:center}.ptitle div:first-child{font-weight:700}.ptitle div:last-child{color:var(--mut);font-size:11px}
+.agents{display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--line);border-radius:7px}
+.agents i{width:10px;height:10px;border-radius:50%;background:#2a3142;display:block;transition:background .3s}
+.agents i.working{background:var(--acc);box-shadow:0 0 8px var(--acc);animation:blink 1s infinite alternate}
+.agents i.done{background:#3ecf8e}.agents i.error{background:var(--err)}
+.agents span{margin-left:6px;color:var(--mut);font-size:12px}
+@keyframes blink{to{opacity:.45}}
+.brain{color:var(--mut);font-size:11px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main{display:grid;grid-template-columns:230px 1fr 320px 300px;min-height:0}
+section{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+section h3{margin:0;padding:10px 12px 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);font-weight:700;display:flex;justify-content:space-between}
+.scroll{overflow:auto;min-height:0;flex:1}
+.lib{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px 12px 10px}
+.lib div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px;cursor:pointer;text-align:center;font-size:10px;color:var(--mut)}
+.lib div:hover{border-color:var(--acc)}.lib svg{width:100%;height:54px}
+.types{padding:0 12px 10px;display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.types button{font-size:11px;padding:5px 6px;text-align:left}
+.types button::before{content:"";display:inline-block;width:7px;height:7px;border-radius:2px;background:var(--acc2);margin-right:6px}
+.wave{padding:0 12px 10px}.wave canvas{width:100%;height:30px;display:block;margin:4px 0;background:var(--panel);border-radius:6px}
+.wave .lbl{font-size:10px;color:var(--mut)}
+.mid{display:flex;flex-direction:column;min-width:0}
+.view{flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:0;background:repeating-conic-gradient(#11141b 0 25%,#0f1218 0 50%) 0 0/24px 24px}
+.stagebox{position:relative;box-shadow:0 10px 40px #0008;border-radius:6px;overflow:hidden}
+#stage{transform-origin:0 0;position:absolute;left:0;top:0}
+.transport{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--line)}
+.transport input[type=range]{flex:1;accent-color:var(--acc)}
+.tc{font-variant-numeric:tabular-nums;color:var(--mut);min-width:96px;text-align:right}
+pre,textarea.code{margin:0;font:12px/1.5 Consolas,"Cascadia Code",monospace;color:#cfe3ff}
+textarea.code{flex:1;width:100%;background:#0b0d12;border:none;border-top:1px solid var(--line);padding:10px 12px;resize:none;outline:none;white-space:pre;tab-size:2}
+.codehead{padding:0 12px 6px;color:var(--mut);font-size:11px;display:flex;justify-content:space-between}
+.codehead .err{color:var(--err)}
+.insp{padding:0 12px 12px}
+.row{display:flex;align-items:center;gap:8px;margin:7px 0}
+.row label{width:76px;color:var(--mut);font-size:11px;flex:none}
+.row input[type=text],.row select,.row textarea{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 7px;min-width:0}
+.row textarea{resize:vertical;min-height:44px}
+.row input[type=range]{flex:1;accent-color:var(--acc)}
+.row .v{width:42px;text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+.row input[type=color]{width:34px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:1px}
+#curve{width:100%;height:150px;background:#0b0d12;border:1px solid var(--line);border-radius:8px;display:block;cursor:crosshair}
+.presets{display:flex;gap:4px;margin:6px 0}.presets button{flex:1;font-size:11px;padding:4px}
+.presets button.on{border-color:var(--acc);color:var(--acc)}
+.sep{height:1px;background:var(--line);margin:10px 0}
+footer{border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 300px;min-height:0}
+.tl{display:flex;flex-direction:column;min-width:0;padding:8px 12px;gap:6px}
+.tlhead{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.12em}
+.track{position:relative;height:56px;background:var(--panel);border-radius:8px;overflow:hidden;cursor:pointer}
+.track.voice{height:26px}
+.clip{position:absolute;top:4px;bottom:4px;border-radius:6px;padding:4px 8px;overflow:hidden;font-size:11px;white-space:nowrap;text-overflow:ellipsis;border:1px solid #0004}
+.clip.sel{outline:2px solid #fff}
+.clip small{display:block;opacity:.7;font-size:10px}
+.vclip{position:absolute;top:4px;bottom:4px;background:#2b3a6a;border-radius:4px;overflow:hidden}
+.vclip canvas{width:100%;height:100%;display:block}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--acc);pointer-events:none;box-shadow:0 0 6px var(--acc)}
+.ruler{position:relative;height:14px;color:var(--mut);font-size:10px}
+.ruler span{position:absolute;transform:translateX(-50%)}
+.agentlog{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.log{flex:1;overflow:auto;padding:6px 12px;font-size:11.5px}
+.log div{margin:3px 0;color:#c8cfdd}.log b{color:var(--acc);font-weight:600;margin-right:4px}.log time{color:#5d667b;margin-right:6px}
+.ask{display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--line)}
+.ask input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:6px 9px;outline:none}
+.progress{height:3px;background:#222838;position:relative;overflow:hidden}.progress i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);width:0;transition:width .3s}
+.modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:50}
+.modal.on{display:flex}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:min(560px,92vw)}
+.card h2{margin:0 0 10px;font-size:18px}.card p{color:var(--mut);margin:4px 0 12px}
+.card textarea{width:100%;min-height:90px;background:#0b0d12;border:1px solid var(--line);border-radius:8px;padding:10px;outline:none;resize:vertical}
+.card .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.plist div{padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin:6px 0;cursor:pointer;display:flex;justify-content:space-between}
+.plist div:hover{border-color:var(--acc)}.plist small{color:var(--mut)}
+video{max-width:100%;max-height:70vh;border-radius:8px;display:block;margin:auto}
+.empty{color:var(--mut);padding:12px}
+</style></head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo"><b></b>Hinata <span>motion</span></div>
+    <nav class="menu"><button id="mNew">New</button><button id="mOpen">Projects</button><button id="mVoice">Re-record voice</button><button id="mFolder">Folder</button></nav>
+    <div class="ptitle"><div id="title">-</div><div id="sub">-</div></div>
+    <div class="agents" id="agents" title="Agents"></div>
+    <div class="brain" id="brain"></div>
+    <button class="primary" id="render">Render MP4</button>
+  </header>
+  <div class="progress"><i id="prog"></i></div>
+  <main>
+    <section>
+      <h3>Characters</h3><div class="lib" id="lib"></div>
+      <h3>Add scene</h3><div class="types" id="types"></div>
+      <h3>Voice</h3><div class="wave scroll" id="waves"></div>
+    </section>
+    <section class="mid">
+      <div class="view" id="view"><div class="stagebox" id="stagebox"><div id="stage"></div></div></div>
+      <div class="transport">
+        <button id="play">Play</button>
+        <input type="range" id="scrub" min="0" max="1000" value="0">
+        <span class="tc" id="tc">0.0 / 0.0 s</span>
+      </div>
+    </section>
+    <section>
+      <h3>Scene code <span id="sceneNo"></span></h3>
+      <div class="codehead"><span>JSON - edit and click away to apply</span><span id="codeErr" class="err"></span></div>
+      <textarea class="code" id="code" spellcheck="false"></textarea>
+    </section>
+    <section>
+      <h3>Motion</h3>
+      <div class="insp scroll" id="insp">
+        <canvas id="curve" width="560" height="300"></canvas>
+        <div class="presets" id="presets"></div>
+        <div class="row"><label>Duration</label><input type="range" id="dur" min="1.2" max="10" step="0.1"><span class="v" id="durV"></span></div>
+        <div class="row"><label>Speed (all)</label><input type="range" id="speed" min="0.5" max="2" step="0.05"><span class="v" id="speedV"></span></div>
+        <div class="row"><label>Character</label><select id="mascot"></select><input type="color" id="mcolor"></div>
+        <div class="row"><label>Mood</label><select id="mood"></select></div>
+        <div class="row"><label>Size</label><input type="range" id="mscale" min="0.4" max="2" step="0.05"><span class="v" id="mscaleV"></span></div>
+        <div class="row"><label>Position X</label><input type="range" id="mx" min="-10" max="80" step="1"><span class="v" id="mxV"></span></div>
+        <div class="row"><label>Position Y</label><input type="range" id="my" min="-10" max="80" step="1"><span class="v" id="myV"></span></div>
+        <div class="sep"></div>
+        <div class="row"><label>Type</label><select id="stype"></select></div>
+        <div class="row"><label>Headline</label><input type="text" id="headline"></div>
+        <div class="row"><label>Sub / CTA</label><input type="text" id="subt"></div>
+        <div class="row"><label>Voice line</label><textarea id="voice"></textarea></div>
+        <div class="row"><label>Transition</label><select id="trans"><option value="">auto</option><option>fade</option><option>slide</option><option>zoom</option><option>wipe</option></select></div>
+        <div class="sep"></div>
+        <div class="row"><label>Colours</label><input type="color" id="cbg" title="Background"><input type="color" id="cfg" title="Text"><input type="color" id="cacc" title="Accent"><input type="color" id="cacc2" title="Accent 2"></div>
+        <div class="row"><label>Format</label><select id="size"><option value="vertical">Vertical 9:16</option><option value="wide">Wide 16:9</option><option value="square">Square 1:1</option></select></div>
+        <div class="row"><button id="dup">Duplicate scene</button><button id="del">Delete scene</button></div>
+        <div class="row"><button id="up">Move left</button><button id="down">Move right</button></div>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <div class="tl">
+      <div class="tlhead"><span>Timeline</span><span id="tlinfo"></span></div>
+      <div class="ruler" id="ruler"></div>
+      <div class="track" id="track"><div class="playhead" id="ph"></div></div>
+      <div class="track voice" id="vtrack"><div class="playhead" id="ph2"></div></div>
+    </div>
+    <div class="agentlog">
+      <h3 style="margin:0;padding:8px 12px 2px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)">Agents</h3>
+      <div class="log" id="log"></div>
+      <div class="ask"><input id="askIn" placeholder="Tell the agents what to change..."><button id="askBtn">Send</button></div>
+    </div>
+  </footer>
+</div>
+
+<div class="modal" id="newModal"><div class="card">
+  <h2>New motion video</h2><p>Describe the video. The agents write the storyboard, record the voice and render it.</p>
+  <textarea id="brief" placeholder="A 20 second reel for my startup Voderon - we build websites for small shops in Warangal"></textarea>
+  <div class="btns"><button data-close>Cancel</button><button class="primary" id="go">Make it</button></div>
+</div></div>
+<div class="modal" id="openModal"><div class="card"><h2>Projects</h2><div class="plist" id="plist"></div>
+  <div class="btns"><button data-close>Close</button></div></div></div>
+<div class="modal" id="vidModal"><div class="card" style="width:min(900px,94vw)"><h2>Rendered video</h2><video id="vid" controls></video>
+  <div class="btns"><button id="vFolder">Open folder</button><button data-close>Close</button></div></div></div>
+
+<script src="/static/runtime.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const COLORS = ["#c6f432", "#7b5cff", "#ff7ac6", "#ffcf3f", "#5fd1ff", "#ff8a5b", "#3ecf8e"];
+const PRESETS = { Smooth: [0.22, 1, 0.36, 1], Pop: [0.34, 1.56, 0.64, 1], Snap: [0.7, 0, 0.2, 1], Soft: [0.45, 0, 0.55, 1], Linear: [0, 0, 1, 1] };
+let info = { types: [], mascots: [], moods: [], agents: [] };
+let pid = new URLSearchParams(location.search).get("id");
+let project = null, tl = null, sel = 0, t = 0, playing = false, lastTick = 0, dirty = false, saveTimer = null, lastUpdated = "";
+let lastRenderState = "";
+
+// ------------------------------------------------------------ api
+const api = {
+  get: p => fetch(p).then(r => r.json()),
+  post: (p, b) => fetch(p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) }).then(r => r.json()),
+};
+
+// ------------------------------------------------------------ stage
+function rebuild(keepTime = true) {
+  if (!project) return;
+  const stage = $("stage");
+  tl = HXMotion.build(stage, project);
+  fitStage();
+  if (!keepTime) t = 0;
+  t = Math.min(t, tl.duration);
+  tl.seek(t);
+  drawTimeline();
+  drawWaves();
+  showScene();
+  $("title").textContent = project.title;
+  $("sub").textContent = `${project.scenes.length} scenes · ${tl.duration.toFixed(1)} s · ${tl.width}x${tl.height}`;
+}
+function fitStage() {
+  if (!tl) return;
+  const v = $("view"), pad = 28;
+  const s = Math.min((v.clientWidth - pad) / tl.width, (v.clientHeight - pad) / tl.height);
+  $("stage").style.transform = `scale(${s})`;
+  $("stagebox").style.width = tl.width * s + "px";
+  $("stagebox").style.height = tl.height * s + "px";
+}
+addEventListener("resize", () => { fitStage(); drawTimeline(); });
+
+function seek(x) {
+  if (!tl) return;
+  t = Math.max(0, Math.min(tl.duration, x));
+  tl.seek(t);
+  $("scrub").value = tl.duration ? Math.round(t / tl.duration * 1000) : 0;
+  $("tc").textContent = `${t.toFixed(1)} / ${tl.duration.toFixed(1)} s`;
+  const pct = tl.duration ? t / tl.duration * 100 : 0;
+  $("ph").style.left = pct + "%"; $("ph2").style.left = pct + "%";
+  const starts = tl.sceneStarts();
+  let cur = 0; starts.forEach((s, i) => { if (t >= s) cur = i; });
+  document.querySelectorAll(".clip").forEach((c, i) => c.style.opacity = i === cur ? 1 : 0.78);
+}
+function loop(now) {
+  if (playing && tl) {
+    const dt = (now - lastTick) / 1000;
+    let nt = t + dt;
+    if (nt >= tl.duration) { nt = tl.duration; playing = false; $("play").textContent = "Play"; }
+    seek(nt);
+    audioSync();
+  }
+  lastTick = now;
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+$("play").onclick = () => {
+  if (!tl) return;
+  if (t >= tl.duration - 0.05) seek(0);
+  playing = !playing; $("play").textContent = playing ? "Pause" : "Play";
+  if (!playing) stopAudio(); else audioSync(true);
+};
+$("scrub").oninput = e => { seek(e.target.value / 1000 * (tl ? tl.duration : 0)); stopAudio(); };
+
+// voice playback during preview
+const audios = {};
+function stopAudio() { Object.values(audios).forEach(a => { a.pause(); }); }
+function audioSync(force) {
+  if (!tl || !project) return;
+  const starts = tl.sceneStarts(), sp = project.speed || 1;
+  project.scenes.forEach((s, i) => {
+    if (!s.voice_file) return;
+    const a = audios[i] || (audios[i] = new Audio(`/files/${pid}/audio/${s.voice_file}?${project.updated}`));
+    const st = starts[i] + 0.25 / sp, local = t - st;
+    const inside = local >= 0 && local < (s.voice_len || 99);
+    if (inside && playing) {
+      if (a.paused || force) { a.currentTime = Math.max(0, local); a.play().catch(() => {}); }
+    } else if (!a.paused) a.pause();
+  });
+}
+
+// ------------------------------------------------------------ timeline
+function drawTimeline() {
+  if (!tl || !project) return;
+  const track = $("track"), vt = $("vtrack");
+  track.querySelectorAll(".clip").forEach(c => c.remove());
+  vt.querySelectorAll(".vclip").forEach(c => c.remove());
+  const starts = tl.sceneStarts(), D = tl.duration, sp = project.speed || 1;
+  project.scenes.forEach((s, i) => {
+    const c = document.createElement("div");
+    c.className = "clip" + (i === sel ? " sel" : "");
+    c.style.left = starts[i] / D * 100 + "%";
+    c.style.width = (s.duration / sp) / D * 100 + "%";
+    c.style.background = COLORS[i % COLORS.length];
+    c.style.color = "#111";
+    c.innerHTML = `<b>${i + 1}. ${s.type.replace("_", " ")}</b><small></small>`;
+    c.querySelector("small").textContent = (s.headline || "").replace(/[\[\]]/g, "");
+    c.onclick = e => { e.stopPropagation(); select(i); seek(starts[i] + 0.01); };
+    track.insertBefore(c, $("ph"));
+    if (s.voice_file && s.voice_len) {
+      const v = document.createElement("div");
+      v.className = "vclip";
+      v.style.left = (starts[i] + 0.25 / sp) / D * 100 + "%";
+      v.style.width = (s.voice_len) / D * 100 + "%";
+      const cv = document.createElement("canvas"); v.appendChild(cv);
+      vt.insertBefore(v, $("ph2"));
+      peaks(s, cv);
+    }
+  });
+  const r = $("ruler"); r.innerHTML = "";
+  const step = D > 40 ? 10 : D > 15 ? 5 : 2;
+  for (let x = 0; x <= D; x += step) { const sp2 = document.createElement("span"); sp2.style.left = x / D * 100 + "%"; sp2.textContent = x + "s"; r.appendChild(sp2); }
+  $("tlinfo").textContent = `${project.scenes.length} scenes · ${D.toFixed(1)} s`;
+}
+[$("track"), $("vtrack")].forEach(tr => tr.onclick = e => {
+  const r = tr.getBoundingClientRect();
+  seek((e.clientX - r.left) / r.width * tl.duration); stopAudio();
+});
+
+const peakCache = {};
+async function peaks(s, canvas) {
+  try {
+    const key = s.voice_file + project.updated;
+    let data = peakCache[key];
+    if (!data) {
+      const buf = await (await fetch(`/files/${pid}/audio/${s.voice_file}?${project.updated}`)).arrayBuffer();
+      const ac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+      const audio = await ac.decodeAudioData(buf);
+      const ch = audio.getChannelData(0), n = 120, block = Math.floor(ch.length / n);
+      data = []; for (let i = 0; i < n; i++) { let m = 0; for (let j = 0; j < block; j++) m = Math.max(m, Math.abs(ch[i * block + j])); data.push(m); }
+      peakCache[key] = data;
+    }
+    const w = canvas.width = canvas.clientWidth * 2 || 200, h = canvas.height = canvas.clientHeight * 2 || 40;
+    const g = canvas.getContext("2d"); g.fillStyle = "#8fb4ff";
+    const bw = w / data.length;
+    data.forEach((v, i) => { const bh = Math.max(2, v * h); g.fillRect(i * bw, (h - bh) / 2, Math.max(1, bw - 1), bh); });
+  } catch (e) { }
+}
+function drawWaves() {
+  const box = $("waves"); box.innerHTML = "";
+  const withVoice = project.scenes.map((s, i) => [s, i]).filter(([s]) => s.voice_file);
+  if (!withVoice.length) { box.innerHTML = '<div class="empty">No voice yet. Write voice lines and click "Re-record voice".</div>'; return; }
+  withVoice.forEach(([s, i]) => {
+    const l = document.createElement("div"); l.className = "lbl"; l.textContent = `Scene ${i + 1} · ${(s.voice_len || 0).toFixed(1)} s`;
+    const c = document.createElement("canvas");
+    box.appendChild(l); box.appendChild(c); peaks(s, c);
+  });
+}
+
+// ------------------------------------------------------------ inspector + code
+function cur() { return project && project.scenes[sel]; }
+function select(i) { sel = Math.max(0, Math.min(project.scenes.length - 1, i)); showScene(); drawTimeline(); }
+function showScene() {
+  const s = cur(); if (!s) return;
+  $("sceneNo").textContent = `scene ${sel + 1} of ${project.scenes.length}`;
+  if (document.activeElement !== $("code")) $("code").value = JSON.stringify(s, null, 2);
+  $("codeErr").textContent = "";
+  const set = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
+  set("dur", s.duration); $("durV").textContent = (+s.duration).toFixed(1) + "s";
+  set("speed", project.speed); $("speedV").textContent = (+project.speed).toFixed(2) + "x";
+  set("mascot", s.mascot); set("mcolor", s.mascot_color); set("mood", s.mood);
+  set("mscale", s.mascot_scale || 1); $("mscaleV").textContent = (+(s.mascot_scale || 1)).toFixed(2);
+  set("mx", s.mascot_x ?? 6); $("mxV").textContent = Math.round(s.mascot_x ?? 6) + "%";
+  set("my", s.mascot_y ?? 6); $("myV").textContent = Math.round(s.mascot_y ?? 6) + "%";
+  set("stype", s.type); set("headline", s.headline || ""); set("subt", s.sub || ""); set("voice", s.voice || "");
+  set("trans", s.transition || "");
+  set("cbg", project.style.bg); set("cfg", project.style.fg); set("cacc", project.style.accent); set("cacc2", project.style.accent2);
+  set("size", project.size);
+  drawCurve();
+}
+function changed(rebuildStage = true) {
+  dirty = true;
+  if (rebuildStage) rebuild();
+  else showScene();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 600);
+}
+async function saveNow() {
+  if (!project) return;
+  const saved = await api.post("/api/project/" + pid, project);
+  lastUpdated = saved.updated; dirty = false;
+  const keep = sel; project = saved; sel = Math.min(keep, project.scenes.length - 1);
+}
+const bind = (id, fn, live = true) => $(id).addEventListener(live ? "input" : "change", e => { const s = cur(); if (!s) return; fn(s, e.target.value); changed(); });
+bind("dur", (s, v) => s.duration = +v);
+bind("speed", (s, v) => project.speed = +v);
+bind("mascot", (s, v) => s.mascot = v, false);
+bind("mcolor", (s, v) => s.mascot_color = v);
+bind("mood", (s, v) => s.mood = v, false);
+bind("mscale", (s, v) => s.mascot_scale = +v);
+bind("mx", (s, v) => s.mascot_x = +v);
+bind("my", (s, v) => s.mascot_y = +v);
+bind("stype", (s, v) => s.type = v, false);
+bind("headline", (s, v) => s.headline = v);
+bind("subt", (s, v) => s.sub = v);
+bind("voice", (s, v) => s.voice = v);
+bind("trans", (s, v) => { if (v) s.transition = v; else delete s.transition; }, false);
+bind("cbg", (s, v) => project.style.bg = v);
+bind("cfg", (s, v) => project.style.fg = v);
+bind("cacc", (s, v) => project.style.accent = v);
+bind("cacc2", (s, v) => project.style.accent2 = v);
+bind("size", (s, v) => project.size = v, false);
+$("code").addEventListener("change", () => {
+  try {
+    const obj = JSON.parse($("code").value);
+    if (typeof obj !== "object" || Array.isArray(obj)) throw new Error("a scene must be an object");
+    project.scenes[sel] = obj; $("codeErr").textContent = ""; changed();
+  } catch (e) { $("codeErr").textContent = e.message; }
+});
+$("dup").onclick = () => { project.scenes.splice(sel + 1, 0, JSON.parse(JSON.stringify(cur()))); sel++; changed(); };
+$("del").onclick = () => { if (project.scenes.length < 2) return; project.scenes.splice(sel, 1); sel = Math.max(0, sel - 1); changed(); };
+$("up").onclick = () => { if (sel < 1) return; const s = project.scenes.splice(sel, 1)[0]; project.scenes.splice(--sel, 0, s); changed(); };
+$("down").onclick = () => { if (sel >= project.scenes.length - 1) return; const s = project.scenes.splice(sel, 1)[0]; project.scenes.splice(++sel, 0, s); changed(); };
+
+// easing curve editor
+const curve = $("curve"); let drag = -1;
+function ease() { const s = cur(); return (s && s.ease) || project.ease || PRESETS.Smooth; }
+function drawCurve() {
+  const g = curve.getContext("2d"), W = curve.width, H = curve.height, p = 34;
+  const X = v => p + v * (W - 2 * p), Y = v => H - p - v * (H - 2 * p);
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = "#1f2533"; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(X(i / 4), Y(0)); g.lineTo(X(i / 4), Y(1)); g.stroke(); g.beginPath(); g.moveTo(X(0), Y(i / 4)); g.lineTo(X(1), Y(i / 4)); g.stroke(); }
+  const [x1, y1, x2, y2] = ease();
+  g.strokeStyle = "#5b6378"; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(x1), Y(y1)); g.stroke();
+  g.beginPath(); g.moveTo(X(1), Y(1)); g.lineTo(X(x2), Y(y2)); g.stroke();
+  g.strokeStyle = "#c6f432"; g.lineWidth = 4;
+  g.beginPath(); g.moveTo(X(0), Y(0)); g.bezierCurveTo(X(x1), Y(y1), X(x2), Y(y2), X(1), Y(1)); g.stroke();
+  for (const [x, y] of [[x1, y1], [x2, y2]]) { g.fillStyle = "#fff"; g.beginPath(); g.arc(X(x), Y(y), 9, 0, 7); g.fill(); }
+  g.fillStyle = "#8a93a8"; g.font = "20px Segoe UI";
+  g.fillText(`cubic-bezier(${ease().map(v => (+v).toFixed(2)).join(", ")})`, p, 26);
+  document.querySelectorAll("#presets button").forEach(b => b.classList.toggle("on", JSON.stringify(PRESETS[b.textContent]) === JSON.stringify(ease())));
+}
+function curvePt(e) {
+  const r = curve.getBoundingClientRect(), p = 34 * r.width / curve.width;
+  return [Math.max(0, Math.min(1, (e.clientX - r.left - p) / (r.width - 2 * p))), Math.max(-0.6, Math.min(1.8, 1 - (e.clientY - r.top - p) / (r.height - 2 * p)))];
+}
+curve.onpointerdown = e => {
+  const [x, y] = curvePt(e), a = ease();
+  drag = Math.hypot(x - a[0], y - a[1]) < Math.hypot(x - a[2], y - a[3]) ? 0 : 1;
+  curve.setPointerCapture(e.pointerId);
+};
+curve.onpointermove = e => {
+  if (drag < 0) return;
+  const [x, y] = curvePt(e), a = ease().slice();
+  a[drag * 2] = Math.round(x * 100) / 100; a[drag * 2 + 1] = Math.round(y * 100) / 100;
+  cur().ease = a; drawCurve();
+};
+curve.onpointerup = () => { if (drag >= 0) { drag = -1; changed(); } };
+Object.keys(PRESETS).forEach(n => { const b = document.createElement("button"); b.textContent = n; b.onclick = () => { cur().ease = PRESETS[n].slice(); changed(); }; $("presets").appendChild(b); });
+
+// ------------------------------------------------------------ library
+function fillLibrary() {
+  const lib = $("lib"); lib.innerHTML = "";
+  info.mascots.filter(m => m !== "none").forEach((m, i) => {
+    const d = document.createElement("div");
+    d.appendChild(HXMotion.mascot(m, ["#ff6b6b", "#5f8bff", "#3ecf8e", "#ff9f43", "#c56cf0"][i % 5], i % 2 ? "wow" : "happy"));
+    d.appendChild(document.createTextNode(m));
+    d.title = "Use in the selected scene";
+    d.onclick = () => { const s = cur(); if (!s) return; s.mascot = m; changed(); };
+    lib.appendChild(d);
+  });
+  const ty = $("types"); ty.innerHTML = "";
+  info.types.forEach(tp => {
+    const b = document.createElement("button"); b.textContent = tp.replace("_", " ");
+    b.onclick = () => {
+      const base = { type: tp, headline: "New [scene]", sub: "", voice: "", duration: 3, mascot: cur() ? cur().mascot : "blob", mood: "happy" };
+      if (tp === "big_number") Object.assign(base, { number: "100", prefix: "", suffix: "%" });
+      if (tp === "list") base.items = ["First point", "Second point", "Third point"];
+      if (tp === "phone") Object.assign(base, { chat_name: "Chat", messages: [{ from: "them", text: "Hey!" }, { from: "me", text: "Hi there" }] });
+      project.scenes.splice(sel + 1, 0, base); sel++; changed();
+    };
+    ty.appendChild(b);
+  });
+  const fillSel = (id, arr) => { $(id).innerHTML = arr.map(v => `<option>${v}</option>`).join(""); };
+  fillSel("mascot", info.mascots); fillSel("mood", info.moods); fillSel("stype", info.types);
+  $("agents").innerHTML = info.agents.map(a => `<i title="${a}" data-a="${a}"></i>`).join("") + '<span id="agentsN">0 agents active</span>';
+}
+
+// ------------------------------------------------------------ agents + polling
+async function poll() {
+  try {
+    if (!pid) { const list = await api.get("/api/projects"); if (list.length) { pid = list[0].id; history.replaceState(null, "", "?id=" + pid); } }
+    if (pid) {
+      const st = await api.get("/api/status/" + pid);
+      $("brain").textContent = "Brain: " + st.brain;
+      let active = 0;
+      for (const [a, s] of Object.entries(st.agents)) {
+        const dot = document.querySelector(`#agents i[data-a="${a}"]`);
+        if (dot) dot.className = s;
+        if (s === "working") active++;
+      }
+      $("agentsN").textContent = `${active} agent${active === 1 ? "" : "s"} active`;
+      $("log").innerHTML = st.log.slice().reverse().map(l => `<div><time>${l.t}</time><b>${l.agent}</b>${esc(l.text)}</div>`).join("");
+      const r = st.render || {};
+      $("prog").style.width = (r.state === "rendering" ? (r.progress || 0) * 100 : r.state === "done" ? 100 : 0) + "%";
+      $("render").disabled = r.state === "rendering" || st.busy;
+      $("render").textContent = r.state === "rendering" ? `Rendering ${Math.round((r.progress || 0) * 100)}%` : "Render MP4";
+      if (r.state === "done" && lastRenderState === "rendering") showVideo(r.video);
+      lastRenderState = r.state;
+      const p = await api.get("/api/project/" + pid);
+      if (p && p.updated && p.updated !== lastUpdated && !dirty) {
+        const first = !project;
+        project = p; lastUpdated = p.updated; sel = Math.min(sel, p.scenes.length - 1);
+        rebuild(!first);
+      }
+    }
+  } catch (e) { }
+  setTimeout(poll, 800);
+}
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function showVideo(url) { $("vid").src = url; $("vidModal").classList.add("on"); }
+
+// ------------------------------------------------------------ menus
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => { b.closest(".modal").classList.remove("on"); $("vid").pause(); });
+$("mNew").onclick = () => { $("newModal").classList.add("on"); $("brief").focus(); };
+$("go").onclick = async () => {
+  const brief = $("brief").value.trim(); if (!brief) return;
+  $("newModal").classList.remove("on");
+  const r = await api.post("/api/new", { brief });
+  pid = r.id; project = null; lastUpdated = ""; sel = 0; history.replaceState(null, "", "?id=" + pid);
+};
+$("mOpen").onclick = async () => {
+  const list = await api.get("/api/projects");
+  $("plist").innerHTML = list.map(p => `<div data-id="${p.id}"><span>${esc(p.title)}</span><small>${p.updated}${p.video ? " · video" : ""}</small></div>`).join("") || '<p class="empty">No projects yet.</p>';
+  $("plist").querySelectorAll("div[data-id]").forEach(d => d.onclick = () => {
+    pid = d.dataset.id; project = null; lastUpdated = ""; sel = 0; history.replaceState(null, "", "?id=" + pid); $("openModal").classList.remove("on");
+  });
+  $("openModal").classList.add("on");
+};
+$("mVoice").onclick = async () => { if (!pid) return; if (dirty) await saveNow(); api.post("/api/voice/" + pid); };
+$("mFolder").onclick = () => pid && api.post("/api/reveal/" + pid);
+$("vFolder").onclick = () => pid && api.post("/api/reveal/" + pid);
+$("render").onclick = async () => { if (!pid) return; if (dirty) await saveNow(); lastRenderState = "rendering"; api.post("/api/render/" + pid); };
+const ask = async () => { const v = $("askIn").value.trim(); if (!v || !pid) return; if (dirty) await saveNow(); $("askIn").value = ""; api.post("/api/edit/" + pid, { text: v }); };
+$("askBtn").onclick = ask; $("askIn").onkeydown = e => { if (e.key === "Enter") ask(); };
+addEventListener("keydown", e => { if (e.code === "Space" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); $("play").click(); } });
+
+api.get("/api/info").then(i => { info = i; fillLibrary(); poll(); });
+})();
+</script>
+</body></html>

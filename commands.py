@@ -42,6 +42,49 @@ _LOOK = re.compile(r"\b(what(?:'s| is| are) (?:this|that|these|on (?:my|the) scr
                    r"how (?:do|can|should) i .*\b(?:this|here|it)\b|read (?:this|my screen|the screen)|"
                    r"what does (?:this|that|it)(?: \w+)? (?:say|mean)|look at (?:my|the) screen|what am i (?:looking at|watching)|"
                    r"(?:explain|summari[sz]e) (?:this|my screen|the screen)|(?:see|check) (?:my|the) screen)\b")
+_WA = r"(?:whats ?app|what's app|whatsup)"
+_WA_SEND = re.compile(
+    rf"^(?:(?:hey |ok |okay |please |can you |could you )*)(?:open {_WA} and )?(?:send|write|type|drop|shoot)?\s*(?:a |an )?"
+    rf"(?:{_WA} )?(?:message|msg|text)?\s*(?:to )?(.+?) (?:on {_WA} )?(?:saying|that says|that|telling (?:him|her|them)(?: that)?|:)\s+(.+)$",
+    re.I)
+_WA_SEND2 = re.compile(rf"^(?:please )?(?:message|text|msg|ping) (.+?) on {_WA}[:,]? (.+)$", re.I)
+_SAVE_CONTACT = re.compile(r"^save (?:contact |number |the number (?:of|for) )?(.+?)(?:'s)?(?: number| whatsapp| contact)?(?: is| as)? ([+\d][\d ()+-]{8,})$")
+_WEB_RE = re.compile(r"\b(reverse[- ]engineer|clone|tech stack of|how is .+ (?:built|made)|analy[sz]e|break down|inspect|copy|mirror|rebuild)\b"
+                     r".*?(?:\b(?:website|site|web ?page|page)\b|\b[a-z0-9-]+(?:\.| dot )(?:com|in|io|org|net|dev|app|ai|co|xyz|me|tech)\b)")
+_KEY_ADD = re.compile(r"\b(?:add|set|save|enter|change|update|use)(?: my| a| the| new)? (?:(claude|gemini|groq|anthropic|google) )?(?:api )?key\b")
+_DESK = re.compile(r"^(?:hinata,? )?(?:take over(?: and| to)?|do it yourself|agent mode|you do it|use my (?:pc|laptop|computer) (?:to|and)|"
+                   r"on my (?:pc|laptop|computer),?|control my (?:pc|laptop|computer) (?:to|and)|work on my (?:pc|laptop|computer) (?:to|and))"
+                   r"[:,]?\s+(.+)$", re.I)
+_MOTION = re.compile(r"\b(?:make|create|generate|build|produce|design)\b.{0,30}?\b(?:motion|animated|animation|explainer|promo|"
+                     r"ad|advert|commercial|reel|short|video)\b.{0,40}?\b(?:about|for|on|explaining|promoting|showing|of)\b", re.I)
+_MY_VIDEO = re.compile(r"\b(?:my|this|that|the) (?:last |latest |recent |newest |screen )?(?:video|videos|clip|recording)s?\b|"
+                       r"\b(?:edit|cut|trim) a video\b|[a-z]:[\\/].+\.(?:mp4|mov|mkv|webm|avi)", re.I)
+_VID_EDIT = re.compile(r"\b(edit|cut|trim|speed|slow|faster|compress|mute|caption|captions|subtitle|subtitles|gif|rotate|"
+                       r"join|merge|combine|reel|shorts?|vertical|music|audio|mp3|keep|remove|fade|brightness|smaller|whatsapp)\b", re.I)
+_ACTION_WORDS = re.compile(
+    r"\b(open|close|play|pause|start|launch|run|make|create|build|write|type|send|call|text|message|set|turn|switch|"
+    r"increase|decrease|mute|delete|remove|move|copy|rename|search|google|find|download|install|order|pair|connect|"
+    r"remind|timer|alarm|screenshot|volume|brightness|shut ?down|restart|lock|sleep|draft|note|task|clone|"
+    r"my (?:ip|laptop|pc|computer|files?|folder|phone|battery|screen|wifi|downloads|desktop|clipboard|tasks?|notes?))\b")
+_QUESTION_START = re.compile(
+    r"^(?:so |and |ok |okay |hey |well |please |can you |could you )*(?:what|who|whom|whose|why|how|when|where|which|"
+    r"is|are|was|were|do|does|did|can|could|should|would|will|tell me|explain|define|describe|give me|"
+    r"teach me|suggest|recommend|compare|difference between|meaning of|translate|solve|calculate)\b")
+
+
+def _is_plain_question(t: str) -> bool:
+    """A question or chat that needs no action on the PC or phone."""
+    if _ACTION_WORDS.search(t) or re.search(r"\b(this|that|these|here|on screen)\b", t):
+        return False
+    return bool(_QUESTION_START.match(t)) or t.endswith("?")
+
+
+def _keep(raw: str, lowered_part: str) -> str:
+    """The same words from the original sentence, with their capital letters."""
+    i = raw.lower().find(lowered_part)
+    return raw[i:i + len(lowered_part)] if i >= 0 else lowered_part
+
+
 CANCEL_WORDS = {"cancel", "no", "stop", "don't", "do not", "nahi", "never mind", "nevermind", "cancel it", "abort"}
 
 
@@ -99,14 +142,31 @@ def _resolve_pending(t: str):
             x, y, _label = payload
             phone.tap_point(x, y)
             return phone.after_payment()
+        if kind == "whatsapp_send":
+            import whatsapp
+            return whatsapp.send(payload)
         if kind == "ai_call":
             import call_agent
             return call_agent.start(payload, speak_status=_speak, overlay=_overlay)
         if kind == "phone_shell":
             out = phone.execute_shell(payload)
             return out if len(out) < 300 else "Done. " + out[:300]
+        if kind == "desk_click":
+            import desk_agent
+            res = desk_agent.confirm_click(payload)
+            return _ask(res) if isinstance(res, Confirm) else res
     _pending = None        # she was told something else - the old request is dropped, so a
     return None            # later stray "yes" can never trigger it
+
+
+def _say_later(text: str):
+    """Speaks the result of a background job (videos, edits) when it finishes."""
+    print(f"[commands] background job: {text}")
+    if _speak and text:
+        try:
+            _speak(text)
+        except Exception:
+            pass
 
 
 def _hide_hologram():
@@ -137,6 +197,20 @@ def _open_firewall_settings():
         os.startfile("windowsdefender://network/")
     except OSError:
         pass
+
+
+def _website(text: str, clone: bool) -> str:
+    """Reverse engineer (and optionally save a study copy of) a website."""
+    import webre
+    url = webre.normalise_url(text)
+    if not url:
+        return "Which website? Say the address, like: reverse engineer example dot com."
+    try:
+        _speak(f"On it. {'Copying' if clone else 'Analysing'} {url.split('//')[-1].split('/')[0]}.")
+    except Exception:
+        pass
+    _hide_hologram()
+    return webre.run(url, clone=clone, generate=nlu.generate if nlu.available() else None)
 
 
 def _ghost_for_capture():
@@ -253,6 +327,35 @@ def _execute(name, a, g):
         return phone.order_food(str(g("item")), str(g("app", "swiggy")), str(g("restaurant")))
     if name == "look_at_screen":
         return vision.look(str(g("question")), hide_overlay=_ghost_for_capture)
+    if name == "whatsapp_message":
+        import whatsapp
+        _hide_hologram()
+        return whatsapp.prepare(str(g("who")), str(g("message")), overlay=_overlay)
+    if name == "website_reverse_engineer":
+        return _website(str(g("url")), bool(g("clone", False)))
+    if name == "make_motion_video":
+        import motion
+        return motion.make_async(str(g("brief")), speak=_speak)
+    if name == "edit_video":
+        import video_edit
+        import threading
+        threading.Thread(target=lambda: _say_later(video_edit.edit(str(g("request")))), daemon=True).start()
+        return "Editing the video now. I'll tell you when it's ready."
+    if name == "pc_agent":
+        import desk_agent
+        _hide_hologram()
+        return desk_agent.run(str(g("goal")))
+    if name == "team_task":
+        import team
+        act = str(g("action", "list")).lower()
+        return team.add_task(str(g("text"))) if act == "add" else \
+            team.done_task(str(g("text"))) if act == "done" else team.list_tasks()
+    if name == "team_note":
+        import team
+        return team.add_note(str(g("text"))) if str(g("action", "add")).lower() == "add" else team.read_notes()
+    if name == "draft_email":
+        import team
+        return team.draft_email(str(g("to")), str(g("about")), generate=nlu.generate)
     if name == "live_info":
         kind = str(g("kind", "news")).lower()
         if kind == "iss":
@@ -445,6 +548,130 @@ def handle(text: str) -> str:
     if r is not None:
         return r
 
+    # ---- WhatsApp from the laptop: "whatsapp Vishal saying I'm on my way"
+    if "on my phone" not in t and re.search(_WA, t) and (m := _WA_SEND.match(raw.strip(" .!?")) or _WA_SEND2.match(raw.strip(" .!?"))):
+        import whatsapp
+        _acted = True
+        _hide_hologram()
+        res = whatsapp.prepare(m.group(1), m.group(2), overlay=_overlay)
+        return _ask(res) if isinstance(res, Confirm) else res
+    if (m := _SAVE_CONTACT.match(t)):
+        import whatsapp
+        return _info(whatsapp.save_contact(m.group(1), m.group(2)))
+
+    # ---- big brain: cloud key / big local model
+    if _KEY_ADD.search(t) and not re.search(r"\b(whats ?app|contact|number|password)\b", t):
+        import brain
+        if not _overlay:
+            return "Open my command bar and say 'add my API key' again."
+        _hide_hologram()
+        key = _overlay.ask_text("Paste your Claude, Gemini or Groq API key.\n"
+                                "It's saved on this laptop only and used for big jobs (videos, the desktop agent).",
+                                title="API key")
+        return _info(brain.save_key(key) if key else "Okay, no key added.")
+    if re.search(r"\b(remove|delete|forget) (?:my |the )?(?:api )?key\b", t):
+        import brain
+        return _info(brain.remove_key())
+    if re.search(r"\b(which|what) (?:brain|model|ai)\b.*\b(using|use|running|have)\b", t):
+        import brain
+        return _info(f"Quick answers use {nlu.model_name() or 'the local model'}. Big jobs use {brain.describe()}.")
+    if re.search(r"\bdownload (?:the )?(?:big|bigger|smart|smarter|coder) (?:model|brain)\b", t):
+        import brain
+        return _info(brain.download_big_model())
+
+    # ---- skills
+    if re.fullmatch(r"(?:what|which|list|show)(?: are| me)?(?: all)? (?:your|my) skills|what can you do|list skills", t):
+        import skills
+        return _info(skills.summary())
+    if re.search(r"\bopen (?:my |the )?skills? folder\b", t):
+        import skills
+        _acted = True
+        _hide_hologram()
+        return skills.open_folder()
+
+    # ---- motion studio
+    if re.search(r"\bopen (?:the |my )?(?:motion |video )?studio\b", t):
+        import motion
+        _acted = True
+        _hide_hologram()
+        return motion.open_in_browser(motion.latest_id())
+    if re.search(r"\brender (?:the |my )?(?:motion )?(?:video|reel|animation)\b", t):
+        import motion
+        _acted = True
+        return motion.render_async(speak=_speak)
+    if (m := re.match(r"^(?:in|on|for) (?:the|my) (?:motion |animated )?(?:video|reel|animation),? (.+)$", t)) or \
+            (m := re.match(r"^(?:change|edit|update) (?:the|my) (?:motion |animated )?(?:video|reel|animation)[:,]? (.+)$", t)) or \
+            (m := re.match(r"^((?:make|change|set|put) scene \d+ .+)$", t)):
+        import motion
+        pid = motion.latest_id()
+        if pid:
+            _acted = True
+            import threading
+            threading.Thread(target=lambda: _say_later(motion.edit(pid, _keep(raw, m.group(1)))), daemon=True).start()
+            motion.open_in_browser(pid)
+            return "Okay, my agents are changing it. Watch the studio."
+    if _MOTION.search(t) and not _MY_VIDEO.search(t):
+        import motion
+        _acted = True
+        _hide_hologram()
+        return motion.make_async(raw, speak=_speak)
+
+    # ---- video editing
+    if _MY_VIDEO.search(t) and _VID_EDIT.search(t):
+        import video_edit
+        import threading
+        _acted = True
+        _hide_hologram()
+        threading.Thread(target=lambda: _say_later(video_edit.edit(raw)), daemon=True).start()
+        return "Editing the video now. I'll tell you when it's ready."
+
+    # ---- the desktop agent: Hinata works the PC herself
+    if (m := _DESK.match(raw.strip(" .!?"))):
+        import desk_agent
+        _acted = True
+        _hide_hologram()
+        res = desk_agent.run(m.group(1))
+        return _ask(res) if isinstance(res, Confirm) else res
+
+    # ---- reopen a recorded website
+    if (m := re.search(r"\bopen (?:the |my )?(?:offline |live |study )?copy of (.+)", t)):
+        import webre
+        _acted = True
+        _hide_hologram()
+        return webre.open_copy(m.group(1))
+
+    # ---- website reverse engineering / study copy
+    if (m := _WEB_RE.search(t)):
+        _acted = True
+        return _website(raw, clone=bool(re.search(r"\b(clone|copy|download|snapshot|mirror|rebuild)\b", t)))
+
+    # ---- founder tools: tasks, notes, email drafts
+    if (m := re.match(r"(?:add|new|create)(?: a)? (?:task|to ?do)(?: to)?:? (.+)", t)) or \
+            (m := re.match(r"remind me to (.+?)(?: later)?$", t) if " in " not in t and " at " not in t else None):
+        import team
+        return _info(team.add_task(_keep(raw, m.group(1))))
+    if re.fullmatch(r"(?:what(?:'s| is| are)|show|read|list|tell me)(?: me)?(?: all)? (?:my |the )?(?:tasks?|to ?do(?: list)?|task list)(?: for today| today)?", t):
+        import team
+        return _info(team.list_tasks())
+    if (m := re.match(r"(?:task )?(?:number )?(\w+) (?:task )?(?:is )?(?:done|finished|completed?)$", t)) and "task" in t or \
+            (m := re.match(r"(?:mark|finish|complete|tick off) (?:task )?(?:number )?(.+?)(?: as)?(?: done| finished| complete)?$", t) if "task" in t else None):
+        import team
+        return _info(team.done_task(m.group(1)))
+    if (m := re.match(r"(?:note|take a note|note down|write down|make a note)(?: that)?:? (.+)", t)):
+        import team
+        return _info(team.add_note(_keep(raw, m.group(1))))
+    if re.fullmatch(r"(?:read|show|what are)(?: me)? my notes", t):
+        import team
+        return _info(team.read_notes())
+    if re.fullmatch(r"(?:give me )?(?:my )?(?:daily |morning |founder )?brief(?:ing)?|plan my day|what(?:'s| is) on my plate", t):
+        import team
+        return _info(team.brief())
+    if (m := re.match(r"(?:draft|write|compose)(?: an| a)? (?:e-?mail|mail) to (.+?) (?:about|regarding|saying|that|for) (.+)", t)):
+        import team
+        _acted = True
+        _hide_hologram()
+        return team.draft_email(m.group(1), _keep(raw, m.group(2)), generate=nlu.generate if nlu.available() else None)
+
     # ---- firewall: Hinata never changes security settings herself - she opens them for you
     if re.search(r"\bfire ?wall\b|\bmcafee\b|\bantivirus\b", t):
         _acted = True
@@ -499,6 +726,29 @@ def handle(text: str) -> str:
             return nlu.run_agent(raw, execute, _should_stop, phone_hint=True)
         return "I didn't understand that phone command, and my AI brain is offline."
 
+    # ---- skills (your own .md / .py files)
+    try:
+        import skills
+        sk = skills.match(t)
+    except Exception as e:
+        print(f"[commands] skills error: {e}")
+        sk = None
+    if sk is not None:
+        _acted = True
+        if sk.kind == "py":
+            from types import SimpleNamespace
+            import brain
+            import agent_cursor
+            ctx = SimpleNamespace(speak=_speak, overlay=_overlay, pc=pc, brain=brain, cursor=agent_cursor,
+                                  execute=execute, phone=phone)
+            try:
+                res = sk.module.run(raw, ctx)
+            except Exception as e:
+                return f"The {sk.name} skill hit an error: {e}"
+            return _ask(res) if isinstance(res, Confirm) else (res or "Done.")
+        if nlu.available():
+            return nlu.run_agent(raw, execute, _should_stop, extra=sk.body)
+
     # ---- instant patterns (single-step requests only)
     multi = bool(_MULTI.search(t)) and nlu.available()
     if not multi:
@@ -512,6 +762,12 @@ def handle(text: str) -> str:
         if res is not None:
             _acted = _acted or not _info_reply
             return res
+
+    # ---- plain questions: answer straight away, no tool-calling step
+    if getattr(config, "QUICK_ANSWERS", True) and nlu.available() and _is_plain_question(t):
+        reply = nlu.quick_answer(raw)
+        if reply:
+            return _info(reply)
 
     # ---- the AI agent
     if nlu.available():

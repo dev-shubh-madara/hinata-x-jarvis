@@ -30,3 +30,10 @@ miniaudio>=1.59
 
 # Optional: offline speech recognition on your GPU (set STT_ENGINE = "whisper")
 # faster-whisper>=1.0
+
+# Agents: desktop agent + WhatsApp by name (Windows UI Automation)
+uiautomation>=2.0.18; sys_platform == "win32"
+# Website live capture, motion video rendering (uses your installed Edge - no browser download)
+playwright>=1.45
+# Video encoding for the motion studio and video editing (bundled ffmpeg)
+imageio-ffmpeg>=0.5

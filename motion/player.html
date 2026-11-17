@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Player</title>
+<link rel="stylesheet" href="/static/runtime.css">
+<style>html,body{margin:0;padding:0;background:#000;overflow:hidden}</style>
+</head><body>
+<div id="stage"></div>
+<script src="/static/runtime.js"></script>
+<script>
+(async () => {
+  const id = new URLSearchParams(location.search).get("id");
+  const project = await (await fetch("/api/project/" + encodeURIComponent(id))).json();
+  const tl = HXMotion.build(document.getElementById("stage"), project);
+  window.__duration = tl.duration;
+  window.__size = [tl.width, tl.height];
+  window.__seek = t => tl.seek(t);
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  tl.seek(0);
+  window.__ready = true;
+})();
+</script>
+</body></html>

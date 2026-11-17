@@ -156,6 +156,11 @@ class HoloRenderer:
         self._acc = np.array(PALETTES["listening"][0], dtype=float)
         self._acc_hi = np.array(PALETTES["listening"][1], dtype=float)
         self._spin = 0.0
+        try:
+            import config as _cfg
+            self.orbit = bool(getattr(_cfg, "HUD_ORBIT", True))
+        except Exception:
+            self.orbit = True
         self._speed = 1.0
         self._think = 0.0
         self._listen = 0.0
@@ -190,8 +195,11 @@ class HoloRenderer:
         if not self.mini:
             self._draw_hud(dh, t, build, dissolve, level, wob)
             self._draw_dust(db, t, build, dissolve, wob)
-        self._draw_rings(dh, t, build, dissolve, wob)
-        self._draw_globe(db, t, build, dissolve, level, wob)
+        core = wob
+        if self.orbit:      # full 360-degree tumble: the core is seen from every side
+            core = wob @ _ry(t * 0.52) @ _rx(t * 0.37) @ _rz(t * 0.23)
+        self._draw_rings(dh, t, build, dissolve, core)
+        self._draw_globe(db, t, build, dissolve, level, core)
         self._draw_core(db, t, build, dissolve, level)
 
         return self._bloom(img)

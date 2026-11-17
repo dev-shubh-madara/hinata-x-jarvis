@@ -300,6 +300,26 @@ TOOLS = [
     _tool("look_at_screen", "LOOK at the user's PC screen and answer about it: 'what is this video about', "
           "'how do I export this', 'what does this error say', 'read this'. Use whenever they say this/that/here "
           "about something on screen.", ["question"], question=(S, "the user's question, as asked")),
+    _tool("whatsapp_message", "Send a WhatsApp message from the PC to a person. Opens the chat with the text typed; "
+          "the user confirms before it is sent.", ["who", "message"],
+          who=(S, "contact name or phone number"), message=(S, "the message, in the user's words")),
+    _tool("website_reverse_engineer", "Reverse engineer a website: tech stack, design, structure, API calls and a "
+          "rebuild plan. With clone=true also saves an offline study copy.", ["url"],
+          url=(S, "website address"), clone=("boolean", "true to also save an offline copy")),
+    _tool("make_motion_video", "Make an animated motion video / reel / ad / explainer with mascots and voice-over "
+          "(a team of video agents plans, voices and renders it).", ["brief"],
+          brief=(S, "what the video is about, who it's for, length or format if said")),
+    _tool("edit_video", "Edit a video file: cut, trim, speed up, slow motion, reel format, captions, compress, mute, "
+          "music, GIF, rotate, join.", ["request"], request=(S, "the user's edit request in their words")),
+    _tool("pc_agent", "Work the PC like a person for multi-step jobs inside apps and windows (clicking buttons, menus, "
+          "settings, filling boxes) when no other tool does it directly.", ["goal"],
+          goal=(S, "the full goal in the user's words")),
+    _tool("team_task", "The user's task list.", ["action"],
+          action=(S, "what to do", ("add", "list", "done")), text=(S, "task text, or task number for done")),
+    _tool("team_note", "Save or read quick notes.", ["action"],
+          action=(S, "what to do", ("add", "read")), text=(S, "the note")),
+    _tool("draft_email", "Write an email with AI and open it in the mail app (the user sends it).", ["about"],
+          to=(S, "person or email address"), about=(S, "what the email should say")),
     _tool("live_info", "Live info that changes all the time.", ["kind"],
           kind=(S, "what", ("iss", "news", "cricket")), topic=(S, "news topic (optional)")),
     _tool("order_food", "Order food on the user's phone (Swiggy/Zomato): opens the app and searches the dish. "
@@ -322,6 +342,9 @@ TOOL_NAMES = {t["function"]["name"] for t in TOOLS}
 FINAL_TOOLS = TOOL_NAMES - {"order_food", "phone_read_screen", "phone_shell", "file_action", "clipboard", "run_powershell", "get_info"}
 
 
+_extra = {"text": ""}     # instructions from a matched skill (skills.py), for this request only
+
+
 def _system_prompt(phone_hint: bool) -> str:
     who = f" The user's name is {config.USER_NAME}." if config.USER_NAME else ""
     title = getattr(config, "USER_TITLE", "")
@@ -340,6 +363,8 @@ def _system_prompt(phone_hint: bool) -> str:
          "if the user wants an action, call the tool. Phone pairing / QR code = call pair_phone.")
     if phone_hint:
         p += " This request is about the user's PHONE - use the phone_ tools."
+    if _extra["text"]:
+        p += "\n\nFollow this skill for the request:\n" + _extra["text"]
     return p
 
 
@@ -425,10 +450,20 @@ _MULTI = re.compile(r"\b(and|then|after that|also|aur|phir|uske baad)\b|,|;", re
 
 # ---------------------------------------------------------------- agent
 
-def run_agent(text: str, execute, should_stop=lambda: False, phone_hint: bool = False) -> str:
-    """Runs the request to completion. execute(name, args) -> result string."""
+def run_agent(text: str, execute, should_stop=lambda: False, phone_hint: bool = False,
+              extra: str = "") -> str:
+    """Runs the request to completion. execute(name, args) -> result string.
+    extra = skill instructions added to the system prompt for this request."""
     if not available():
         return ""
+    _extra["text"] = extra or ""
+    try:
+        return _run_agent(text, execute, should_stop, phone_hint)
+    finally:
+        _extra["text"] = ""
+
+
+def _run_agent(text, execute, should_stop, phone_hint) -> str:
     multi = bool(_MULTI.search(text))
     results: list[str] = []
     try:
@@ -521,6 +556,28 @@ def _run(execute, name, args) -> str:
         res = f"{name} failed: {e}"
     print(f"[agent] {name}({json.dumps(args)[:120]}) -> {res[:120]}  ({time.perf_counter() - t0:.2f}s)")
     return res
+
+
+def quick_answer(text: str):
+    """Fast path for plain questions: no tool list, short answer. None if it fails."""
+    if not available():
+        return None
+    title = getattr(config, "USER_TITLE", "")
+    sys = (f"You are {config.ASSISTANT_NAME}, a warm, sharp female voice assistant"
+           + (f" for {config.USER_NAME}" if config.USER_NAME else "")
+           + (f" (call them '{title}' now and then)" if title else "")
+           + ". Answer in one or two short spoken sentences, plain English, no markdown. "
+             "If you don't know, say so.")
+    try:
+        msg = _chat([{"role": "system", "content": sys}] + _history[-6:] + [{"role": "user", "content": text}],
+                    num_predict=110)
+        reply = _strip_think(msg.get("content", ""))
+        if reply:
+            _remember(text, reply)
+        return reply or None
+    except Exception as e:
+        print(f"[nlu] quick answer failed: {e}")
+        return None
 
 
 def generate(prompt: str, max_chars: int = 12000, json_format: bool = False):

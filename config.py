@@ -62,6 +62,26 @@ FAST_MODEL = "qwen2.5:3b"      # preferred when OLLAMA_MODEL is blank - download
 AGENT_MAX_STEPS = 6            # how many actions the AI may chain for one request
 AI_TEMPERATURE = 0.2
 
+# ---- Big jobs: motion videos, the desktop agent, website rebuild plans ---------------
+# Say "add my API key" once and Hinata uses that cloud brain for big jobs only.
+# Quick answers and normal commands always stay on the fast local model.
+CLOUD_AI = "auto"              # "auto" = whichever key you added | "claude" | "gemini" | "groq" | "off"
+CLOUD_MODELS = {}              # override model names, e.g. {"gemini": "gemini-flash-latest"}
+BIG_LOCAL_MODEL = "qwen2.5-coder:7b"   # stronger local model for big jobs (say "download the big model")
+BROWSER_CHANNEL = "msedge"     # browser used for website capture and video rendering ("msedge" / "chrome")
+
+# ---- Agent cursor -------------------------------------------------------------------
+# When Hinata works your PC herself, a glowing cursor glides to each thing she clicks
+# and shows what she's doing. Press Esc any time to stop her.
+AGENT_CURSOR = True
+AGENT_CURSOR_SPEED = 1.0       # 1 = normal, 2 = twice as fast
+DESK_AGENT_MAX_STEPS = 20
+
+# ---- Motion studio ------------------------------------------------------------------
+STUDIO_PORT = 8740             # the studio runs on http://127.0.0.1:8740
+MOTION_SIZE = "vertical"       # "vertical" (1080x1920 reels) | "wide" (1920x1080) | "square"
+MOTION_FPS = 30
+
 # ---- Safety ------------------------------------------------------------------------
 # The AI can run PowerShell to do things no built-in tool covers.
 # Read-only / harmless commands run instantly; anything that deletes, formats,
@@ -71,9 +91,10 @@ CONFIRM_SECONDS = 25
 
 # ---- 3D HUD -------------------------------------------------------------------------
 HUD_QUALITY = "auto"           # "auto" (adapts to your PC), "ultra", "high", "medium", "low"
-HUD_TARGET_FPS = 50
+HUD_TARGET_FPS = 90            # she lowers the render size by herself to hold this
+HUD_ORBIT = True               # the 3D core turns a full 360 degrees on every axis
 HUD_SCALE = 0.84               # hologram height as a fraction of screen height
-HUD_MAX_PX = 1000              # cap on the shown hologram size (bigger = sharper but slower on 2K screens)
+HUD_MAX_PX = 760               # cap on the shown hologram size (bigger = sharper but slower on 2K screens)
 HUD_RENDER_PROCESS = True      # draw the hologram in its own process (smoothest); False = thread
 HUD_OPACITY = 0.94
 SHOW_CAPTIONS = True           # show what you said + the reply + response time
@@ -119,6 +140,10 @@ KNOWN_SITES = {
 DEFAULT_CITY = ""              # blank = auto-detect from your internet connection
 
 # ---- Phone -----------------------------------------------------------------------------
+QUICK_ANSWERS = True           # plain questions skip the tool-calling step (answers in about a second)
+DEFAULT_COUNTRY_CODE = "91"    # added to 10-digit numbers for WhatsApp
+WHATSAPP_OPEN_WAIT = 2.2       # seconds to wait for WhatsApp to open before pressing Enter
+WHATSAPP_AUTO_SEND = True      # find the contact by name and send straight away (False = ask "confirm" first)
 PAIR_METHOD = "link"           # "link" = Hinata Link (Termux + Shizuku, no adb pairing) | "code" | "qr"
 PHONE_AUTO_RECONNECT = True    # reconnect a paired phone at startup if Wireless debugging is on
 SCRCPY_PATH = "scrcpy"         # for "show my phone screen" (optional, see README)
@@ -134,8 +159,15 @@ def _desktop() -> str:
     return os.path.join(home, "Desktop")
 
 
+def _output_dir() -> str:
+    """Everything Hinata makes goes to the D drive when there is one."""
+    if os.name == "nt" and os.path.isdir("D:\\"):
+        return "D:\\Hinata_Output"
+    return os.path.join(DESKTOP_DIR, "Hinata_Output")
+
+
 DESKTOP_DIR = _desktop()
-OUTPUT_DIR = os.path.join(DESKTOP_DIR, "Hinata_Output")
+OUTPUT_DIR = _output_dir()
 DATA_DIR = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "HinataXHelper")
 for _d in (OUTPUT_DIR, DATA_DIR):
     try:
