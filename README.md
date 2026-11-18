@@ -116,6 +116,16 @@
 </tr>
 </table>
 
+### 🤖 New: agents that do the work
+
+- **Motion studio:** *"make a reel about my startup Voderon"*. Seven small agents plan the scenes, pick the characters, record the voice and time it all. You watch it in the studio (timeline, scene code, easing curve, sliders), change anything by hand or by voice (*"make scene 2 red"*), and the MP4 is only saved when you say *"save the video"*.
+- **Desktop agent with a cursor:** *"take over and turn on dark mode in settings"*. She reads the window, decides the next step and a glowing cursor glides to each button. Press <kbd>Esc</kbd> to stop her. She asks before pressing Send, Pay, Delete or Buy, and never types into password boxes.
+- **Video editing by voice:** *"cut my last video from 0:10 to 0:45"*, *"make it a reel with captions"*, *"compress it for WhatsApp"*. Your original file is never touched.
+- **Website study copy:** *"clone github.com"* records the live site in a hidden Edge window (scrolling, mouse moves, hovers) and replays it offline, so 3D, smooth scroll and cursor effects still run. The report shows the real site and the copy side by side.
+- **WhatsApp by name:** *"WhatsApp Vishal saying I'm on my way"*. No number, no country code. If two chats match, she asks which one.
+- **Skills folder:** drop a `.md` or `.py` file into `Hinata_Output\Skills` and she can do a new job straight away.
+- **Bigger brain for big jobs (optional):** say *"add my API key"* for Claude, Gemini or Groq, or keep everything local with `qwen2.5-coder:7b`.
+
 ---
 
 ## 🚀 Quick start
@@ -127,15 +137,17 @@
 git clone https://github.com/dev-shubh-madara/hinata-x-jarvis.git
 cd hinata-x-jarvis
 
-# 2. the local AI brain (pick one)
-ollama pull qwen2.5:3b        # fast, works on most PCs
-ollama pull qwen2.5:7b        # smarter, needs a 6 GB+ GPU
+# 2. the local AI brain
+ollama pull qwen2.5:3b         # fast answers, works on most PCs
+ollama pull qwen2.5-coder:7b   # optional: better motion videos and desktop agent (6 GB+ GPU)
 
 # 3. install and run
 setup_and_run.bat             # installs everything, then starts Hinata
 ```
 
-After the first run, just use `run.bat`, or run `py -3 main.py` from the terminal.
+After the first run, start her with `start_quiet.bat` (no black window), `run.bat`, or `py -3 main.py` from the terminal.
+
+New laptop? There's a full step-by-step guide in [docs/SETUP.md](docs/SETUP.md).
 
 <details>
 <summary><b>Manual install / PyAudio problems</b></summary>

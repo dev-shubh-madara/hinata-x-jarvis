@@ -16,3 +16,12 @@
 - Faster replies: small default model (`qwen2.5:3b`), shorter end-of-speech pause, quicker phone reconnect.
 - Starts with Windows (`install_autostart.bat`), runs as a single instance.
 - Pairing code is the default phone pairing method, with a firewall hint and retries.
+
+## 1.2.0
+- Motion studio: say "make a reel about ..." and a small team of agents plans the scenes, picks the characters, records the voice and times it. Preview in the studio, edit by hand or by voice, and the MP4 is saved only when you say "save the video".
+- Desktop agent: "take over and ..." works the PC step by step with a visible gliding cursor. Esc stops it. Risky buttons need a spoken confirm and password boxes are never typed into.
+- Video editing by voice: cut, speed, reel format, captions, compress, mute, music, GIF, join.
+- Website study copy now records the live site in Edge and replays it offline, so JavaScript, 3D and smooth scroll still work. The report compares real vs copy.
+- WhatsApp by name: finds the chat in WhatsApp Desktop, no number or country code needed.
+- Skills folder for new jobs without touching the code, plus an optional cloud brain (Claude, Gemini or Groq key) for big jobs.
+- start_quiet.bat starts Hinata with no console window. New-laptop guide in docs/SETUP.md.
