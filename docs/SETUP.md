@@ -45,7 +45,7 @@ git clone https://github.com/dev-shubh-madara/hinata-x-jarvis.git Hinata-X-Helpe
 
 ## 4. Install everything
 
-Open the `Hinata-X-Helper` folder and double-click **`install.bat`**.
+Open the `Hinata-X-Helper` folder and double-click **`install.bat`**. (From PowerShell, type `.\install.bat` - PowerShell needs the `.\` in front.)
 It installs all the Python packages, including the parts for the agents, the motion studio and video editing. It takes 3–5 minutes.
 
 If PyAudio fails to install, open Command Prompt in the folder and run:

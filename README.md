@@ -143,6 +143,7 @@ ollama pull qwen2.5-coder:7b   # optional: better motion videos and desktop agen
 
 # 3. install and run
 setup_and_run.bat             # installs everything, then starts Hinata
+                              # (in PowerShell type .\setup_and_run.bat)
 ```
 
 After the first run, start her with `start_quiet.bat` (no black window), `run.bat`, or `py -3 main.py` from the terminal.
