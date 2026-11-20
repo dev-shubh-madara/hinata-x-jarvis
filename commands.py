@@ -699,6 +699,20 @@ def handle(text: str) -> str:
         _hide_hologram()
         return skills.open_folder()
 
+    # ---- MCP plug-ins
+    if re.search(r"\b(?:reload|restart|refresh|load|start) (?:my |the |all )?(?:plug-?ins?|mcp(?: servers?)?)\b", t):
+        import mcp_client
+        return _info(mcp_client.start_all())
+    if re.fullmatch(r"(?:what|which|list|show)(?: are)?(?: me)?(?: my| your| the)? (?:plug-?ins?|mcp servers?)(?: do you have| are loaded)?", t):
+        import mcp_client
+        return _info(mcp_client.summary())
+    if re.search(r"\bopen (?:my |the )?(?:plug-?ins?|mcp) (?:file|config|settings)\b", t):
+        import mcp_client
+        _acted = True
+        _hide_hologram()
+        mcp_client.write_example()
+        return pc.open_target(mcp_client.CONFIG_PATH)
+
     # ---- motion studio
     if re.search(r"\bopen (?:the |my )?(?:motion |video )?studio\b", t):
         import motion
