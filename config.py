@@ -84,6 +84,7 @@ CLOUD_AI = "auto"              # "auto" = whichever key you added | "claude" | "
 CLOUD_MODELS = {}              # override model names, e.g. {"gemini": "gemini-flash-latest"}
 BIG_LOCAL_MODEL = "qwen2.5-coder:7b"   # stronger local model for big jobs (say "download the big model")
 BROWSER_CHANNEL = "msedge"     # browser used for website capture and video rendering ("msedge" / "chrome")
+BROWSER_AGENT_CHANNEL = "chrome"   # browser Hinata drives for you ("chrome" / "msedge"), with its own profile
 
 # ---- Agent cursor -------------------------------------------------------------------
 # When Hinata works your PC herself, a glowing cursor glides to each thing she clicks

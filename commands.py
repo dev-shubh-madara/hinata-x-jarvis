@@ -138,7 +138,12 @@ def _resolve_pending(t: str):
         _pending = None
         return "That request timed out, so I didn't do it." if first.split(" ")[0] in ("confirm", "yes") else None
     if first in CANCEL_WORDS or _CANCEL_RE.search(first):
-        _pending = None
+        p, _pending = _pending, None
+        if p["kind"] in _cancel_handlers:
+            try:
+                _cancel_handlers[p["kind"]](p["payload"])
+            except Exception as e:
+                print(f"[commands] cancel cleanup: {e}")
         return "Cancelled."
     if _pending["kind"] == "phone_pay" and not re.search(r"\b(confirm|pay)\b", first) and \
             first in CONFIRM_WORDS:
@@ -434,6 +439,7 @@ def _execute(name, a, g):
 
 _handlers: dict = {}
 _confirm_handlers: dict = {}
+_cancel_handlers: dict = {}
 
 
 def register_handler(name: str, fn, info: bool = False):
@@ -443,9 +449,12 @@ def register_handler(name: str, fn, info: bool = False):
         INFO_TOOLS.add(name)
 
 
-def register_confirm(kind: str, fn):
-    """fn(payload) -> reply, run when the user says 'confirm' to a Confirm of this kind."""
+def register_confirm(kind: str, fn, on_cancel=None):
+    """fn(payload) -> reply, run when the user says 'confirm' to a Confirm of this kind.
+    on_cancel(payload) cleans up if they say 'cancel'."""
     _confirm_handlers[kind] = fn
+    if on_cancel:
+        _cancel_handlers[kind] = on_cancel
 
 
 def _timer_done(msg):
@@ -799,6 +808,25 @@ def handle(text: str) -> str:
         import call_agent
         res = call_agent.prepare(m.group(1).removeprefix("my ").strip(), m.group(2))
         return _ask(res) if isinstance(res, Confirm) else res
+
+    # ---- coding: fix the error on screen, open in VS Code
+    if (re.search(r"\b(?:fix|solve|debug|resolve)\b.{0,25}\b(?:error|bug|traceback|exception|crash)\b", t) or
+            re.search(r"\b(?:error|bug|traceback|exception)\b.{0,25}\b(?:fix|solve|debug|resolve)\b", t)) \
+            and not re.search(r"\bin (?:my |the )?(\S+\.py)\b", t):
+        import coder
+        _acted = True
+        res = coder.fix_from_screen()
+        return _ask(res) if isinstance(res, Confirm) else res
+    if (m := re.match(r"^(?:fix|debug) (?:my |the )?(.+?\.(?:py|js|ts|html|css|java|cpp|c))(?: file)?$", t)):
+        import coder
+        _acted = True
+        res = coder.fix(m.group(1))
+        return _ask(res) if isinstance(res, Confirm) else res
+    if (m := re.match(r"^open (?:my |the )?(.+?) in (?:vs ?code|visual studio code|code)$", t)):
+        import coder
+        _acted = True
+        _hide_hologram()
+        return coder.open_in_vscode(_keep(raw, m.group(1)))
 
     # ---- screen vision / live info (instant routes)
     if _LOOK.search(t) and not _phone_split(raw):
