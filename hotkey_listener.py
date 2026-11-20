@@ -4,10 +4,11 @@ Triggers and speech-to-text.
 Two global hotkeys:
   HOTKEY       -> speak a command
   TYPE_HOTKEY  -> type a command into the command bar (fastest)
+and the wake word ("Hinata ...", see wake.py), which fires the same trigger.
 
 Pressing the voice hotkey while Hinata is talking cuts her off (barge-in).
-Speech-to-text is Google (free, online) by default or faster-whisper
-(offline, uses your GPU) - see STT_ENGINE in config.py.
+Speech-to-text: "fast" (always-on mic + VAD + faster-whisper, see fast_stt.py),
+"whisper" or "google" - see STT_ENGINE in config.py.
 """
 
 import queue
@@ -17,16 +18,22 @@ import speech_recognition as sr
 import config
 import tts_engine
 
-_triggers: "queue.Queue[str]" = queue.Queue()
+_triggers: "queue.Queue[tuple[str, str]]" = queue.Queue()
 _whisper = {"model": None, "failed": False}
+_first = {"text": ""}
 
 
-def _fire(kind: str):
+def _fire(kind: str, text: str = ""):
     if tts_engine.is_speaking():
         tts_engine.stop()
     # collapse repeated presses into one trigger
     if _triggers.qsize() < 2:
-        _triggers.put(kind)
+        _triggers.put((kind, text or ""))
+
+
+def fire_wake(rest: str):
+    """Wake word heard. rest = what came after her name ('' = just listen)."""
+    _fire("voice", rest)
 
 
 def install_hotkeys():
@@ -42,8 +49,16 @@ def install_hotkeys():
 
 
 def wait_for_trigger() -> str:
-    """Blocks until a hotkey fires. Returns 'voice' or 'type'."""
-    return _triggers.get()
+    """Blocks until a hotkey or the wake word fires. Returns 'voice' or 'type'."""
+    kind, text = _triggers.get()
+    _first["text"] = text
+    return kind
+
+
+def take_first_text() -> str:
+    """The command said in the same breath as the wake word, once."""
+    t, _first["text"] = _first["text"], ""
+    return t
 
 
 def calibrate(recognizer: sr.Recognizer, mic: sr.Microphone):
@@ -77,7 +92,10 @@ def _load_whisper():
 
 
 def preload():
-    if config.STT_ENGINE == "whisper":
+    if config.STT_ENGINE == "fast":
+        import fast_stt
+        fast_stt.load_whisper()
+    elif config.STT_ENGINE == "whisper":
         _load_whisper()
 
 
@@ -105,6 +123,15 @@ def drain():
 
 def capture_command(recognizer: sr.Recognizer, mic: sr.Microphone, timeout=None) -> str | None:
     """Records and transcribes one command. None if nothing usable was heard."""
+    first = take_first_text()
+    if first:
+        return first
+    if config.STT_ENGINE == "fast":
+        import fast_stt
+        if fast_stt.mic().start():
+            return fast_stt.listen(config.LISTEN_TIMEOUT if timeout is None else timeout)
+        if recognizer is None:
+            return None
     print("[mic] Listening...")
     with mic as source:
         try:

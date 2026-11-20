@@ -29,10 +29,21 @@ END_OF_SPEECH_PAUSE = 1.5      # she waits this long after you stop talking befo
 SPEECH_LANGUAGE = "en-IN"      # "en-IN" Indian English, "hi-IN" Hindi, "en-US"...
 
 # Speech-to-text engine:
-#   "google"  - free, no setup, needs internet (~0.6-1s)
-#   "whisper" - fully offline on your GPU via faster-whisper (pip install faster-whisper)
-STT_ENGINE = "google"
-WHISPER_MODEL = "small"        # tiny / base / small / medium - bigger = more accurate, slower
+#   "fast"    - always-on mic + voice detection + faster-whisper on your GPU (offline, ~0.2s).
+#               Falls back to Google by itself if faster-whisper isn't installed.
+#   "google"  - free, no setup, needs internet (~0.6-1s), opens the mic per command
+#   "whisper" - old offline path (opens the mic per command)
+STT_ENGINE = "fast"
+WHISPER_MODEL = "small"        # tiny / base / small / medium / large-v3-turbo - bigger = more accurate, slower
+END_SILENCE_MS = 450           # "fast" engine: silence after your last word before she acts (raise if she cuts you off)
+VAD_AGGRESSIVENESS = 2         # 0-3, higher ignores more background noise (needs webrtcvad)
+MIC_DEVICE_INDEX = None        # None = Windows default microphone
+
+# ---- Wake word -------------------------------------------------------------------
+# Say her name instead of pressing the hotkey. "Hinata" opens her; "Hinata, open
+# Chrome" does it in one breath. Runs offline on the same always-on mic.
+WAKE_WORD = True
+WAKE_WORDS = ["hinata", "jarvis"]   # any of these at the start of a sentence wakes her
 
 # ---- Conversation mode ---------------------------------------------------------
 # While you're just talking (questions, chat - anything that needs no work on the

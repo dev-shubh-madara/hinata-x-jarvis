@@ -111,9 +111,10 @@ def _run(overlay, text: str):
 
 def voice_loop(overlay: MicOverlay):
     recognizer = mic = None
-    if sr is None:
+    fast = config.STT_ENGINE == "fast" and _fast_mic(overlay)
+    if not fast and sr is None:
         overlay.set_info("MIC", "NO SPEECHRECOGNITION")
-    else:
+    elif not fast:
         try:
             recognizer = sr.Recognizer()
             mic = sr.Microphone()
@@ -125,6 +126,10 @@ def voice_loop(overlay: MicOverlay):
             recognizer = mic = None
 
     hotkey_listener.install_hotkeys()
+    if fast:
+        import wake
+        if wake.start(hotkey_listener.fire_wake, is_speaking=tts_engine.is_speaking):
+            overlay.set_info("WAKE", "SAY HINATA")
     brain_ok = _brain_status(overlay)
     _phone_status(overlay)
     greeting = f"{config.ASSISTANT_NAME} is online."
@@ -135,7 +140,8 @@ def voice_loop(overlay: MicOverlay):
     while True:
         kind = hotkey_listener.wait_for_trigger()
         try:
-            if kind == "voice" and recognizer is None:
+            _pause_wake(True)
+            if kind == "voice" and recognizer is None and not fast:
                 overlay.expand()
                 overlay.set_state("speaking")
                 speak(f"I can't hear you - no microphone. Press {config.TYPE_HOTKEY.replace('+', ' ')} to type instead.")
@@ -162,6 +168,27 @@ def voice_loop(overlay: MicOverlay):
             speak(f"Something went wrong: {e}")
         finally:
             overlay.collapse()
+            _pause_wake(False)
+
+
+def _fast_mic(overlay) -> bool:
+    """Opens the always-on microphone used by the fast speech engine and the wake word."""
+    import fast_stt
+    if fast_stt.mic().start():
+        overlay.set_info("MIC", "ALWAYS ON")
+        return True
+    print(f"[main] fast speech unavailable ({fast_stt.mic().error}) - using Google speech")
+    config.STT_ENGINE = "google"
+    return False
+
+
+def _pause_wake(on: bool):
+    """The wake word sleeps while a session is listening, so a command isn't heard twice."""
+    try:
+        import wake
+        wake.pause() if on else wake.resume()
+    except Exception:
+        pass
 
 
 def _warm_up():
