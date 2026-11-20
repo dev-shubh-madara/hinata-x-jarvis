@@ -374,6 +374,16 @@ FINAL_TOOLS = TOOL_NAMES - {"order_food", "phone_read_screen", "phone_shell", "f
 
 
 _extra = {"text": ""}     # instructions from a matched skill (skills.py), for this request only
+_ctx = {"text": ""}       # remembered facts that matter for this request (memory.py)
+
+
+def _set_context(text: str):
+    try:
+        import memory
+        _ctx["text"] = memory.context_for(text)
+    except Exception as e:
+        print(f"[nlu] memory unavailable: {e}")
+        _ctx["text"] = ""
 
 
 def _system_prompt(phone_hint: bool) -> str:
@@ -394,6 +404,8 @@ def _system_prompt(phone_hint: bool) -> str:
          "if the user wants an action, call the tool. Phone pairing / QR code = call pair_phone.")
     if phone_hint:
         p += " This request is about the user's PHONE - use the phone_ tools."
+    if _ctx["text"]:
+        p += "\n\n" + _ctx["text"]
     if _extra["text"]:
         p += "\n\nFollow this skill for the request:\n" + _extra["text"]
     return p
@@ -593,6 +605,7 @@ def run_agent(text: str, execute, should_stop=lambda: False, phone_hint: bool = 
     if not available():
         return ""
     _extra["text"] = extra or ""
+    _set_context(text)
     try:
         return _run_agent(text, execute, should_stop, phone_hint)
     finally:
@@ -710,6 +723,9 @@ def quick_answer(text: str, on_sentence=None):
            + (f" (call them '{title}' now and then)" if title else "")
            + ". Answer in one or two short spoken sentences, plain English, no markdown. "
              "If you don't know, say so.")
+    _set_context(text)
+    if _ctx["text"]:
+        sys += " " + _ctx["text"]
     try:
         msg = _chat([{"role": "system", "content": sys}] + _history[-6:] + [{"role": "user", "content": text}],
                     num_predict=110, on_sentence=on_sentence)

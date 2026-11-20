@@ -63,6 +63,16 @@ _MY_VIDEO = re.compile(r"\b(?:my|this|that|the) (?:last |latest |recent |newest 
                        r"\b(?:edit|cut|trim) a video\b|[a-z]:[\\/].+\.(?:mp4|mov|mkv|webm|avi)", re.I)
 _VID_EDIT = re.compile(r"\b(edit|cut|trim|speed|slow|faster|compress|mute|caption|captions|subtitle|subtitles|gif|rotate|"
                        r"join|merge|combine|reel|shorts?|vertical|music|audio|mp3|keep|remove|fade|brightness|smaller|whatsapp)\b", re.I)
+_REMEMBER = re.compile(r"^(?:please |hinata,? )?(?:remember|don'?t forget|keep in mind|note in your memory)"
+                       r"(?: that|,| this[:,]?)? (?!to\b|me\b|when\b|what\b|everything\b)(.{4,})$")
+_RECALL = re.compile(r"^(?:what|anything)(?: else)? do you (?:know|remember)(?: about)?(?: me)?(?: (?:about |regarding )?(.+))?$|"
+                     r"^do you remember (.+)$")
+_FORGET_ALL = re.compile(r"^(?:forget|delete|erase|wipe) (?:everything|all)(?: you know| you remember| i told you)?(?: about me)?$")
+_FORGET = re.compile(r"^(?:forget|stop remembering) (?:that |about |the )?(?!it$|that$|this$)(.{3,})$")
+_KIND_WORDS = (r"(?:ppt|pptx|pdf|doc|docx|word file|excel|sheet|spreadsheet|video|photo|picture|pic|screenshot|resume|cv|"
+               r"notes|file|presentation|slides|recording|song|notebook|zip|apk|project folder|folder)s?")
+_FIND_FILE = re.compile(r"^(?:find|locate|where(?:'s| is| are| did i (?:save|put|keep))) (?:my |the |that )?(.+?)(?: file| files)?$")
+_OPEN_FILE = re.compile(rf"^open (?:my |the |that )?(.*\b{_KIND_WORDS}\b.*)$")
 _ACTION_WORDS = re.compile(
     r"\b(open|close|play|pause|start|launch|run|make|create|build|write|type|send|call|text|message|set|turn|switch|"
     r"increase|decrease|mute|delete|remove|move|copy|rename|search|google|find|download|install|order|pair|connect|"
@@ -167,6 +177,9 @@ def _resolve_pending(t: str):
             import desk_agent
             res = desk_agent.confirm_click(payload)
             return _ask(res) if isinstance(res, Confirm) else res
+        if kind == "memory_wipe":
+            import memory
+            return memory.forget_all()
         if kind in _confirm_handlers:
             res = _confirm_handlers[kind](payload)
             return _ask(res) if isinstance(res, Confirm) else res
@@ -584,6 +597,38 @@ def handle(text: str) -> str:
     if r is not None:
         return r
 
+    # ---- long-term memory
+    if (m := _REMEMBER.match(t)):
+        import memory
+        return _info(memory.remember(_keep(raw, m.group(1))))
+    if (m := _RECALL.match(t)):
+        import memory
+        return _info(memory.answer(m.group(1) or ""))
+    if _FORGET_ALL.match(t):
+        import memory
+        return _ask(Confirm("memory_wipe", None, f"Forget all {memory.count()} things you told me? "
+                                                 "Say confirm, or cancel."))
+    if (m := _FORGET.match(t)):
+        import memory
+        return _info(memory.forget(m.group(1)))
+
+    # ---- files anywhere on the PC
+    if (m := _FIND_FILE.match(t)) and not re.search(r"\b(on (?:google|youtube|the web|internet)|my phone)\b", t):
+        import file_index
+        hits = file_index.search(m.group(1))
+        if hits:
+            _acted = True
+            _hide_hologram()
+            file_index.show_in_folder(m.group(1))
+            return f"Found it: {file_index.describe(hits)}"
+        return _info(file_index._nothing(m.group(1)))
+    if (m := _OPEN_FILE.match(t)):
+        import file_index
+        if file_index.search(m.group(1)):
+            _acted = True
+            _hide_hologram()
+            return file_index.open_best(m.group(1))
+
     # ---- WhatsApp from the laptop: "whatsapp Vishal saying I'm on my way"
     if "on my phone" not in t and re.search(_WA, t) and (m := _WA_SEND.match(raw.strip(" .!?")) or _WA_SEND2.match(raw.strip(" .!?"))):
         import whatsapp
@@ -842,3 +887,11 @@ def handle(text: str) -> str:
     _acted = True
     pc.search_web(raw)
     return f"My AI brain is offline, so I searched the web for that. {nlu.status_reason()}"
+
+
+# ---------------------------------------------------------------- new powers plug in here
+try:
+    import powers
+    powers.load()
+except Exception as _e:          # a broken power must never stop Hinata from starting
+    print(f"[commands] powers: {_e}")
