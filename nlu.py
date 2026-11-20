@@ -8,6 +8,8 @@ feeds the results back, and the model continues until the job is done
 rain" or "on my phone open WhatsApp, tap Vishal and type hi" just work.
 
 Speed tricks:
+  * replies stream: each finished sentence goes to the voice straight away,
+    so she starts talking while the model is still writing the rest
   * the model is pre-loaded at startup and kept in memory (keep_alive)
   * single-action requests skip the second model call entirely
   * small context window + capped output length
@@ -337,6 +339,35 @@ TOOLS = [
 ]
 TOOL_NAMES = {t["function"]["name"] for t in TOOLS}
 
+# tools added by other modules (memory, files, browser, coder, MCP plug-ins)
+_EXTRA_TOOLS: dict[str, dict] = {}
+_EXTRA_FINAL: set[str] = set()
+
+
+def register_tools(tools: list, final=()):
+    """Adds tools the agent can call. final = names whose result can be spoken as the answer."""
+    for t in tools:
+        _EXTRA_TOOLS[t["function"]["name"]] = t
+    _EXTRA_FINAL.update(final)
+
+
+def unregister_tools(prefix: str):
+    for name in [n for n in _EXTRA_TOOLS if n.startswith(prefix)]:
+        _EXTRA_TOOLS.pop(name, None)
+        _EXTRA_FINAL.discard(name)
+
+
+def all_tools() -> list:
+    return TOOLS + list(_EXTRA_TOOLS.values())
+
+
+def is_tool(name) -> bool:
+    return name in TOOL_NAMES or name in _EXTRA_TOOLS
+
+
+def _is_final(name) -> bool:
+    return name in FINAL_TOOLS or name in _EXTRA_FINAL
+
 # single-shot tools: when one of these alone answers the request, skip the
 # follow-up model call and reply straight from the tool result (much faster)
 FINAL_TOOLS = TOOL_NAMES - {"order_food", "phone_read_screen", "phone_shell", "file_action", "clipboard", "run_powershell", "get_info"}
@@ -370,7 +401,7 @@ def _system_prompt(phone_hint: bool) -> str:
 
 def _json_prompt(phone_hint: bool) -> str:
     lines = []
-    for t in TOOLS:
+    for t in all_tools():
         f = t["function"]
         lines.append(f"- {f['name']}({', '.join(f['parameters']['properties'])}): {f['description']}")
     return (_system_prompt(phone_hint) + "\n\nTools:\n" + "\n".join(lines) +
@@ -384,10 +415,57 @@ class _NoTools(Exception):
     pass
 
 
-def _chat(messages, tools=None, json_format=False, num_predict=None):
+class Sentences:
+    """Collects streamed text and hands out whole sentences as soon as they end."""
+
+    _END = re.compile(r"(?<=[.!?])[\"')\]]*\s+|\n+")
+
+    def __init__(self, emit):
+        self.emit = emit
+        self.buf = ""
+        self.sent: list[str] = []
+        self.blocked = False                 # a tool call / JSON started: say nothing
+
+    def add(self, text: str):
+        if self.blocked or not text:
+            return
+        self.buf += text
+        if not self.sent and self.buf.lstrip().startswith(("{", "[", "<tool", "```")):
+            self.blocked = True
+            return
+        while True:
+            m = self._END.search(self.buf)
+            # a comma break keeps a very long first sentence from making her wait
+            if not m and not self.sent and len(self.buf) > 140:
+                cut = self.buf.rfind(", ", 60)
+                if cut > 0:
+                    self._out(self.buf[:cut + 1])
+                    self.buf = self.buf[cut + 2:]
+                    continue
+            if not m:
+                return
+            self._out(self.buf[:m.end()])
+            self.buf = self.buf[m.end():]
+
+    def _out(self, piece: str):
+        piece = _strip_think(piece).strip()
+        if piece and re.search(r"[A-Za-z0-9]", piece):
+            self.sent.append(piece)
+            self.emit(piece)
+
+    def finish(self) -> str:
+        if not self.blocked and self.buf.strip():
+            self._out(self.buf)
+        self.buf = ""
+        return " ".join(self.sent)
+
+
+def _chat(messages, tools=None, json_format=False, num_predict=None, on_sentence=None):
     opts = dict(OPTIONS)
     if num_predict:
         opts["num_predict"] = num_predict
+    if on_sentence and not json_format:
+        return _chat_stream(messages, tools, opts, on_sentence)
     payload = {"model": _state["model"], "messages": messages, "stream": False,
                "keep_alive": KEEP_ALIVE, "options": opts}
     if tools:
@@ -402,6 +480,54 @@ def _chat(messages, tools=None, json_format=False, num_predict=None):
     if not r.ok:
         raise RuntimeError(f"Ollama error {r.status_code}: {r.text[:200]}")
     return r.json().get("message", {})
+
+
+def _chat_stream(messages, tools, opts, on_sentence):
+    """Same as _chat, but sentences reach on_sentence while the model is still writing.
+    Returns the message dict; message['_spoken'] = True if all of it was already sent."""
+    payload = {"model": _state["model"], "messages": messages, "stream": True,
+               "keep_alive": KEEP_ALIVE, "options": opts}
+    if tools:
+        payload["tools"] = tools
+    r = _session.post(base_url() + "/api/chat", json=payload, timeout=(5, 180), stream=True)
+    if r.status_code == 400 and tools and "tool" in r.text.lower():
+        raise _NoTools()
+    if r.status_code == 404:
+        raise RuntimeError(f"model '{_state['model']}' not found - run: ollama pull {_state['model']}")
+    if not r.ok:
+        raise RuntimeError(f"Ollama error {r.status_code}: {r.text[:200]}")
+    sp = Sentences(on_sentence)
+    content, calls = "", []
+    in_think = False
+    for line in r.iter_lines():
+        if not line:
+            continue
+        try:
+            chunk = json.loads(line)
+        except ValueError:
+            continue
+        msg = chunk.get("message") or {}
+        if msg.get("tool_calls"):
+            calls.extend(msg["tool_calls"])
+            sp.blocked = True
+        piece = msg.get("content") or ""
+        content += piece
+        # reasoning models think out loud between <think> tags - never speak that
+        if "<think>" in piece:
+            in_think = True
+        if not in_think:
+            sp.add(piece)
+        if "</think>" in piece:
+            in_think = False
+            sp.add(piece.split("</think>", 1)[1])
+        if chunk.get("done"):
+            break
+    spoken = sp.finish() if not calls else ""
+    out = {"role": "assistant", "content": content}
+    if calls:
+        out["tool_calls"] = calls
+    out["_spoken"] = bool(spoken) and not calls and not sp.blocked
+    return out
 
 
 def _strip_think(text):
@@ -429,7 +555,7 @@ def parse_json_answer(content):
     if not isinstance(obj, dict):
         return None
     name = obj.get("tool") or obj.get("name") or obj.get("action")
-    if name in TOOL_NAMES:
+    if is_tool(name):
         return {"tool": name, "args": _parse_args(obj.get("args") or obj.get("arguments") or obj.get("parameters") or {})}
     reply = obj.get("reply") or obj.get("response") or obj.get("answer")
     if isinstance(reply, str):
@@ -450,10 +576,20 @@ _MULTI = re.compile(r"\b(and|then|after that|also|aur|phir|uske baad)\b|,|;", re
 
 # ---------------------------------------------------------------- agent
 
+_stream = {"fn": None, "spoken": False}
+
+
+def last_reply_spoken() -> bool:
+    """True if the last reply was already said sentence by sentence while streaming."""
+    return _stream["spoken"]
+
+
 def run_agent(text: str, execute, should_stop=lambda: False, phone_hint: bool = False,
-              extra: str = "") -> str:
+              extra: str = "", on_sentence=None) -> str:
     """Runs the request to completion. execute(name, args) -> result string.
-    extra = skill instructions added to the system prompt for this request."""
+    extra = skill instructions added to the system prompt for this request.
+    on_sentence = speak each sentence of a chat reply as soon as it's written."""
+    _stream.update(fn=on_sentence, spoken=False)
     if not available():
         return ""
     _extra["text"] = extra or ""
@@ -461,6 +597,7 @@ def run_agent(text: str, execute, should_stop=lambda: False, phone_hint: bool = 
         return _run_agent(text, execute, should_stop, phone_hint)
     finally:
         _extra["text"] = ""
+        _stream["fn"] = None
 
 
 def _run_agent(text, execute, should_stop, phone_hint) -> str:
@@ -494,12 +631,15 @@ def _agent_tools(text, execute, should_stop, phone_hint, multi, results):
     msgs = [{"role": "system", "content": _system_prompt(phone_hint)}] + _history + \
            [{"role": "user", "content": text}]
     for step in range(_max_steps(text)):
-        message = _chat(msgs, tools=TOOLS)
+        message = _chat(msgs, tools=all_tools(), on_sentence=_stream["fn"])
         content = _strip_think(message.get("content", ""))
+        if message.get("_spoken"):
+            _stream["spoken"] = True
+            return content
         calls = []
         for c in message.get("tool_calls") or []:
             fn = c.get("function", {})
-            if fn.get("name") in TOOL_NAMES:
+            if is_tool(fn.get("name")):
                 calls.append((fn["name"], _parse_args(fn.get("arguments", {}))))
         if not calls:
             parsed = parse_json_answer(content) if content.startswith("{") else None
@@ -514,7 +654,7 @@ def _agent_tools(text, execute, should_stop, phone_hint, multi, results):
             msgs.append({"role": "tool", "content": res, "tool_name": name})
             if should_stop():
                 return res
-        if step == 0 and not multi and all(n in FINAL_TOOLS for n, _ in calls):
+        if step == 0 and not multi and all(_is_final(n) for n, _ in calls):
             return " ".join(results)
     return " ".join(results[-2:])
 
@@ -533,7 +673,7 @@ def _agent_json(text, execute, should_stop, phone_hint, multi, results):
         results.append(res)
         if should_stop():
             return res
-        if step == 0 and not multi and name in FINAL_TOOLS:
+        if step == 0 and not multi and _is_final(name):
             return res
         msgs += [{"role": "assistant", "content": content},
                  {"role": "user", "content": f"RESULT of {name}: {res}\nContinue, or reply if finished."}]
@@ -558,8 +698,10 @@ def _run(execute, name, args) -> str:
     return res
 
 
-def quick_answer(text: str):
-    """Fast path for plain questions: no tool list, short answer. None if it fails."""
+def quick_answer(text: str, on_sentence=None):
+    """Fast path for plain questions: no tool list, short answer. None if it fails.
+    With on_sentence the answer streams out sentence by sentence."""
+    _stream["spoken"] = False
     if not available():
         return None
     title = getattr(config, "USER_TITLE", "")
@@ -570,8 +712,9 @@ def quick_answer(text: str):
              "If you don't know, say so.")
     try:
         msg = _chat([{"role": "system", "content": sys}] + _history[-6:] + [{"role": "user", "content": text}],
-                    num_predict=110)
+                    num_predict=110, on_sentence=on_sentence)
         reply = _strip_think(msg.get("content", ""))
+        _stream["spoken"] = bool(msg.get("_spoken"))
         if reply:
             _remember(text, reply)
         return reply or None

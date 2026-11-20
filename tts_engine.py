@@ -5,14 +5,22 @@ Female voice for Hinata X Helper.
     package - natural female voice, no API key. Audio plays through pygame.
     Every phrase is cached on disk, so repeated replies ("Done.", "Opening
     Chrome.") start instantly.
+  * "kokoro": an offline neural voice that runs on your laptop (kokoro_tts.py),
+    no internet at all. Downloaded once (~330 MB) the first time it's used.
   * "system": the built-in Windows SAPI voice (Microsoft Zira), offline.
-    Also used automatically whenever the neural voice fails (no internet).
+    Also used automatically whenever the other voices fail.
 
 Speech runs on its own thread. speak() can be interrupted with stop() -
 pressing the hotkey while she's talking cuts her off (barge-in).
+
+Pipelining: the moment a sentence is queued its audio starts being made in
+the background, so while she says sentence one, sentence two is already
+being synthesized. Streaming replies (nlu.py) feed her one sentence at a
+time, so she starts talking before the AI has finished thinking.
 """
 
 import asyncio
+import concurrent.futures
 import hashlib
 import io
 import math
@@ -26,7 +34,8 @@ import config
 
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
-_q: "queue.Queue[tuple[str, threading.Event]]" = queue.Queue()
+_q: "queue.Queue[tuple[str, object, threading.Event]]" = queue.Queue()
+_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="tts-synth")
 _speaking = threading.Event()
 _stop_flag = threading.Event()
 _CACHE_DIR = os.path.join(config.DATA_DIR, "voice_cache")
@@ -85,9 +94,9 @@ def _init_pygame() -> bool:
     return _state["pygame"]
 
 
-def _play_mp3(data: bytes):
+def _play_mp3(data: bytes, fmt: str = "mp3"):
     import pygame
-    pygame.mixer.music.load(io.BytesIO(data), "mp3")
+    pygame.mixer.music.load(io.BytesIO(data), fmt)
     pygame.mixer.music.play()
     clock = pygame.time.Clock()
     while pygame.mixer.music.get_busy():
@@ -142,10 +151,34 @@ def _speak_system(text: str):
 
 # ---------------------------------------------------------------- worker
 
-def _say(text: str):
-    if config.TTS_ENGINE == "neural" and _init_pygame():
+def _synth(text: str):
+    """(audio bytes, format) for the configured engine. Runs ahead of playback.
+
+    kokoro: offline voice for every sentence it fully knows, the neural voice
+            for the rest (Kokoro skips words it doesn't know).
+    neural: Edge voice; if the internet is down, the offline voice takes over.
+    """
+    import kokoro_tts
+    if config.TTS_ENGINE == "kokoro" and kokoro_tts.covers(text):
         try:
-            _play_mp3(_synth_neural(text))
+            return kokoro_tts.synth(text), "wav"
+        except Exception as e:
+            print(f"[tts] offline voice failed ({e}) - trying the neural voice.")
+    try:
+        return _synth_neural(text), "mp3"
+    except Exception as e:
+        if kokoro_tts.installed():
+            print(f"[tts] neural voice failed ({e}) - using the offline voice.")
+            return kokoro_tts.synth(text), "wav"
+        raise
+
+
+def _say(text: str, future=None):
+    if config.TTS_ENGINE in ("neural", "kokoro") and _init_pygame():
+        try:
+            data, fmt = future.result(timeout=15) if future is not None else _synth(text)
+            if not _stop_flag.is_set():
+                _play_mp3(data, fmt)
             return
         except Exception as e:
             print(f"[tts] neural voice failed ({e}) - using the Windows voice.")
@@ -157,15 +190,19 @@ def _say(text: str):
 
 def _worker():
     while True:
-        text, done = _q.get()
-        _stop_flag.clear()
+        text, future, done = _q.get()
+        if not _barge["cut"]:
+            _stop_flag.clear()
         _speaking.set()
         try:
-            _say(text)
+            if not _stop_flag.is_set():
+                _say(text, future)
         except Exception as e:
             print(f"[tts] speak failed: {e}")
         finally:
-            _speaking.clear()
+            if _q.empty():
+                _speaking.clear()
+                _barge["cut"] = False
             done.set()
 
 
@@ -174,25 +211,45 @@ threading.Thread(target=_worker, daemon=True, name="tts").start()
 
 # ---------------------------------------------------------------- public API
 
+_barge = {"cut": False}
+
+
 def speak(text: str, wait: bool = True):
     print(f"[{config.ASSISTANT_NAME}] {text}")
     if not text:
         return
     done = threading.Event()
-    _q.put((text, done))
+    future = None
+    if config.TTS_ENGINE in ("neural", "kokoro"):
+        future = _pool.submit(_synth, text)          # start making the audio right now
+    _barge["cut"] = False
+    _q.put((text, future, done))
     if wait:
         done.wait(timeout=max(15, len(text) / 7))
+
+
+def wait_idle(timeout: float = 60.0):
+    """Blocks until everything queued has been said (used after a streamed reply)."""
+    import time
+    end = time.time() + timeout
+    while (not _q.empty() or _speaking.is_set()) and time.time() < end:
+        time.sleep(0.03)
 
 
 def stop():
     """Cut off the current sentence and drop anything queued."""
     _stop_flag.set()
+    _barge["cut"] = True
     try:
         while True:
-            _, done = _q.get_nowait()
+            _, future, done = _q.get_nowait()
+            if future is not None:
+                future.cancel()
             done.set()
     except queue.Empty:
         pass
+    if _q.empty():
+        _speaking.clear()
 
 
 def is_speaking() -> bool:

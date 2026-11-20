@@ -24,6 +24,8 @@ from pc_actions import Confirm
 
 _overlay = None
 _speak = None
+_streamer = None        # speaks one sentence at a time while the AI is still writing
+_spoken = False         # the reply was already said while streaming
 _pending: dict | None = None        # {"kind", "payload", "at"}
 _created_pending = False
 _acted = False          # did this command do real work on the PC / phone?
@@ -93,6 +95,16 @@ def set_overlay(overlay):
     _overlay = overlay
 
 
+def set_streamer(fn):
+    """fn(sentence) - called for each sentence of a streamed AI reply."""
+    global _streamer
+    _streamer = fn
+
+
+def already_spoken() -> bool:
+    return _spoken
+
+
 def set_speaker(fn):
     global _speak
     _speak = fn
@@ -154,6 +166,9 @@ def _resolve_pending(t: str):
         if kind == "desk_click":
             import desk_agent
             res = desk_agent.confirm_click(payload)
+            return _ask(res) if isinstance(res, Confirm) else res
+        if kind in _confirm_handlers:
+            res = _confirm_handlers[kind](payload)
             return _ask(res) if isinstance(res, Confirm) else res
     _pending = None        # she was told something else - the old request is dropped, so a
     return None            # later stray "yes" can never trigger it
@@ -397,7 +412,27 @@ def _execute(name, a, g):
         return res
     if name == "phone_mirror":
         return phone.mirror()
+    if name in _handlers:
+        return _handlers[name](a)
     return f"I don't have a tool called {name}."
+
+
+# ---------------------------------------------------------------- plug-in tools
+
+_handlers: dict = {}
+_confirm_handlers: dict = {}
+
+
+def register_handler(name: str, fn, info: bool = False):
+    """fn(args) -> reply | Confirm. info=True: it only reads things (doesn't count as 'work')."""
+    _handlers[name] = fn
+    if info:
+        INFO_TOOLS.add(name)
+
+
+def register_confirm(kind: str, fn):
+    """fn(payload) -> reply, run when the user says 'confirm' to a Confirm of this kind."""
+    _confirm_handlers[kind] = fn
 
 
 def _timer_done(msg):
@@ -535,10 +570,11 @@ def _phone_split(text: str):
 
 def handle(text: str) -> str:
     """Executes a command and returns the reply to speak."""
-    global _created_pending, _acted, _info_reply
+    global _created_pending, _acted, _info_reply, _spoken
     _created_pending = False
     _acted = False
     _info_reply = False
+    _spoken = False
     raw = text.strip()
     t = re.sub(r"\s+", " ", raw.lower()).strip(" .!?")
     if config.ASSISTANT_NAME and t.startswith(("hinata ", "hey hinata ")):
@@ -578,6 +614,26 @@ def handle(text: str) -> str:
     if re.search(r"\bdownload (?:the )?(?:big|bigger|smart|smarter|coder) (?:model|brain)\b", t):
         import brain
         return _info(brain.download_big_model())
+
+    # ---- voice: online neural / offline Kokoro
+    if re.search(r"\b(?:download|install|get) (?:the |your |an )?offline voice\b", t):
+        import kokoro_tts
+        import threading
+        if kokoro_tts.installed():
+            return _info("My offline voice is already here. Say 'switch to offline voice' to use it.")
+        threading.Thread(target=lambda: _say_later(
+            "My offline voice is ready." if kokoro_tts.download(progress=lambda m: None)
+            else "The offline voice download failed."), daemon=True).start()
+        return _info("Downloading my offline voice, about 330 MB. I'll tell you when it's ready.")
+    if re.search(r"\b(?:switch|change|go) to (?:the |your )?(offline|online|neural|internet) voice\b", t):
+        import kokoro_tts
+        offline = "offline" in t
+        if offline and not kokoro_tts.installed():
+            return _info("I need to download my offline voice first. Say 'download the offline voice'.")
+        config.TTS_ENGINE = "kokoro" if offline else "neural"
+        if offline:
+            kokoro_tts.warm_up()
+        return _info("Okay, offline voice from now on." if offline else "Okay, back to my online voice.")
 
     # ---- skills
     if re.fullmatch(r"(?:what|which|list|show)(?: are| me)?(?: all)? (?:your|my) skills|what can you do|list skills", t):
@@ -766,12 +822,17 @@ def handle(text: str) -> str:
 
     # ---- plain questions: answer straight away, no tool-calling step
     if getattr(config, "QUICK_ANSWERS", True) and nlu.available() and _is_plain_question(t):
-        reply = nlu.quick_answer(raw)
+        reply = nlu.quick_answer(raw, on_sentence=_streamer) if _streamer else nlu.quick_answer(raw)
         if reply:
+            _spoken = bool(_streamer) and nlu.last_reply_spoken()
             return _info(reply)
 
     # ---- the AI agent
     if nlu.available():
+        if _streamer:
+            reply = nlu.run_agent(raw, execute, _should_stop, on_sentence=_streamer)
+            _spoken = nlu.last_reply_spoken()
+            return reply
         return nlu.run_agent(raw, execute, _should_stop)
 
     print(f"[commands] AI brain offline: {nlu.status_reason()}")

@@ -94,15 +94,31 @@ def _run(overlay, text: str):
     t0 = time.perf_counter()
     if not nlu.available():
         _brain_status(overlay)
-    reply = commands.handle(text)
+    first = {"t": None}
+
+    def stream(sentence):                   # she starts talking on the first sentence
+        if first["t"] is None:
+            first["t"] = (time.perf_counter() - t0) * 1000
+            print(f"[time] first words after {first['t']:.0f} ms")
+            overlay.set_state("speaking")
+        overlay.set_caption(reply=sentence)
+        speak(sentence, wait=False)
+
+    commands.set_streamer(stream)
+    try:
+        reply = commands.handle(text)
+    finally:
+        commands.set_streamer(None)
     outcome = commands.last_outcome()
     overlay.set_info("AI", (nlu.model_name() or "").upper()[:18] or "OFFLINE")   # live model name          # 'chat' | 'confirm' | 'action'
     ms = (time.perf_counter() - t0) * 1000
     print(f"[time] {ms:.0f} ms  ->  {outcome}")
     if outcome == "action":
         overlay.collapse()                     # work was done - get out of the way
-    overlay.set_caption(reply=reply or "", ms=ms)
-    if reply:
+    overlay.set_caption(reply=reply or "", ms=first["t"] or ms)
+    if reply and commands.already_spoken():
+        tts_engine.wait_idle()               # already said while streaming - just let her finish
+    elif reply:
         overlay.set_state("speaking")
         speak(reply)
     _phone_status(overlay)

@@ -55,9 +55,13 @@ CONVO_LISTEN_TIMEOUT = 8       # seconds she waits for your next sentence
 CONVO_IDLE_SECONDS = 30        # total silence before she closes on her own
 
 # ---- Voice (female) -----------------------------------------------------------
-# "neural" = Microsoft Edge neural voice (natural, needs internet, free, no key)
+# "neural" = Microsoft Edge neural voice (natural, needs internet, free, no key).
+#            If the internet drops she switches to the offline voice by herself.
+# "kokoro" = offline voice on your laptop (say "download the offline voice" once)
 # "system" = built-in Windows voice (Zira) - offline, more robotic
 TTS_ENGINE = "neural"
+KOKORO_VOICE = "heart"                # heart, bella, nicole, nova, sarah, sky, emma, alice
+KOKORO_SPEED = 1.08
 NEURAL_VOICE = "en-IN-NeerjaNeural"   # try: en-US-AriaNeural, en-US-JennyNeural,
                                       #      en-GB-SoniaNeural, hi-IN-SwaraNeural
 VOICE_RATE = "+8%"                    # neural speed, e.g. "+0%", "+15%"
