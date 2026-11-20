@@ -102,6 +102,22 @@ check("router knows it was spoken", commands.already_spoken(), True)
 check("router streamed it", len(said), 3)
 check("next command resets the flag", (commands.handle("cancel"), commands.already_spoken())[1], False)
 
+# ---- tool routing keeps the prompt small enough for the model's context
+import commands as _c  # noqa: F401  (loads the plug-in tools)
+for said, need in [("open notepad and write a poem", "write_document"), ("play lofi on youtube", "play_media"),
+                   ("go to github and click sign in", "browser_click"), ("read this error and fix it", "fix_code"),
+                   ("on my phone open whatsapp", "phone_open_app"), ("what's 2 to the power 40", "run_python"),
+                   ("remind me in 10 minutes to drink water", "set_timer"), ("hey how are you", "open_target")]:
+    nlu._last_sel.clear()
+    sel = nlu.select_tools(said, "phone" in said)
+    names = [x["function"]["name"] for x in sel]
+    size = len(json.dumps(sel)) // 3.6
+    check(f"tools for {said[:30]!r}: has {need}, ~{size:.0f} tok", need in names and size < 2600, True)
+check("all tools would overflow a 4k context", len(json.dumps(nlu.all_tools())) // 3.6 > 4096, True)
+nlu._last_sel.clear()
+nlu.select_tools("play lofi on youtube")
+check("follow-up keeps last turn's tools", "media_control" in [x["function"]["name"] for x in nlu.select_tools("now pause it")], True)
+
 # ---- voice pipeline: sentence 2 is synthesized while sentence 1 plays
 import tts_engine
 config.TTS_ENGINE = "neural"

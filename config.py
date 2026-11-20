@@ -75,6 +75,7 @@ OLLAMA_MODEL = ""              # exact name from "ollama list", or "" to auto-pi
 FAST_MODEL = "qwen2.5:3b"      # preferred when OLLAMA_MODEL is blank - downloaded once automatically; "" = off
                                # fast + smart picks: qwen2.5:3b, qwen2.5:7b, llama3.2:3b
 AGENT_MAX_STEPS = 6            # how many actions the AI may chain for one request
+AI_CONTEXT = 8192              # tokens the model sees at once (prompt + tools + recent chat)
 AI_TEMPERATURE = 0.2
 
 # ---- Big jobs: motion videos, the desktop agent, website rebuild plans ---------------
