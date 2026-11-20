@@ -25,3 +25,17 @@
 - WhatsApp by name: finds the chat in WhatsApp Desktop, no number or country code needed.
 - Skills folder for new jobs without touching the code, plus an optional cloud brain (Claude, Gemini or Groq key) for big jobs.
 - start_quiet.bat starts Hinata with no console window. New-laptop guide in docs/SETUP.md.
+
+## 2.0.0
+- Wake word: say "Hinata" (or "Jarvis"). "Hinata, open Chrome" works in one breath. Offline.
+- One always-open microphone with voice detection: she acts ~0.4 s after your last word instead of 1.5 s.
+- Speech-to-text on the GPU with faster-whisper by default, Google as the fallback.
+- Streaming replies: each sentence is spoken as soon as the model writes it. Tool calls, JSON and `<think>` blocks are never read out.
+- The voice makes the next sentence's audio while the current one plays. Offline Kokoro voice when the internet drops.
+- Tool routing: each request gets only the tools it needs (1-2k tokens instead of 4.4k+, which overflowed the 4k context). Context raised to 8192.
+- Long-term memory: remember, recall, forget. Relevant facts go into the AI's instructions automatically.
+- All-drives file index in SQLite with trigram search; type and date aware ("physics ppt from last week").
+- Browser control in Hinata's own Chrome profile: open, read, click, type, tabs, YouTube. Password boxes are never typed into; pay/send/delete buttons need "confirm".
+- Screen OCR with the Windows OCR engine; error detection from screen text.
+- Coding helper: run Python snippets, fix a file from its traceback with a diff in VS Code, "read this error and fix it".
+- MCP plug-ins from `mcp_servers.json`; writes need "confirm" unless the server is trusted.

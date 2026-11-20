@@ -213,6 +213,13 @@ def _warm_up():
     nlu.warm_up()
     tts_engine.preload()
     hotkey_listener.preload()
+    try:
+        import kokoro_tts
+        import file_index
+        kokoro_tts.warm_up()
+        file_index.start_background()            # all-drives index, quietly, at low priority
+    except Exception as e:
+        print(f"[warmup] {e}")
     phone_pair.auto_reconnect_background()
     try:
         import vision

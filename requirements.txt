@@ -28,8 +28,19 @@ zeroconf>=0.131
 pyaudiowpatch>=0.2.12; sys_platform == "win32"
 miniaudio>=1.59
 
-# Optional: offline speech recognition on your GPU (set STT_ENGINE = "whisper")
-# faster-whisper>=1.0
+# Fast offline speech: always-on mic + voice detection + whisper on your GPU
+faster-whisper>=1.0
+webrtcvad-wheels>=2.0.14
+# Offline voice (Kokoro) - used when the internet drops, or with TTS_ENGINE = "kokoro"
+sherpa-onnx>=1.10
+# Exact screen reading with the OCR built into Windows
+winrt-runtime>=2.0; sys_platform == "win32"
+winrt-Windows.Media.Ocr>=2.0; sys_platform == "win32"
+winrt-Windows.Graphics.Imaging>=2.0; sys_platform == "win32"
+winrt-Windows.Storage.Streams>=2.0; sys_platform == "win32"
+winrt-Windows.Globalization>=2.0; sys_platform == "win32"
+winrt-Windows.Foundation>=2.0; sys_platform == "win32"
+winrt-Windows.Foundation.Collections>=2.0; sys_platform == "win32"
 
 # Agents: desktop agent + WhatsApp by name (Windows UI Automation)
 uiautomation>=2.0.18; sys_platform == "win32"

@@ -178,7 +178,12 @@ def find_file(name: str) -> str | None:
         found = _match(_files, q)
     if found and os.path.exists(found):
         return found
-    return None
+    try:                                    # not in your user folders - look on every drive
+        import file_index
+        hits = [h for h in file_index.search(name) if not h["isdir"]]
+        return hits[0]["path"] if hits else None
+    except Exception:
+        return None
 
 
 def find_folder(name: str) -> str | None:

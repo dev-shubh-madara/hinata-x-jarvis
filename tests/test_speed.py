@@ -1,5 +1,5 @@
 """Speed pack: end-of-speech detection, wake word matching, one-breath commands."""
-import math, os, struct, sys, types, tempfile
+import math, os, struct, sys, time, types, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 os.environ["LOCALAPPDATA"] = tempfile.mkdtemp()
 kb = types.ModuleType("keyboard"); kb.send = lambda k: None; kb.write = lambda t, delay=0: None
@@ -54,6 +54,28 @@ ep = fast_stt.Endpointer(end_ms=450)
 vad = fast_stt.EnergyVAD()
 clicked = [ep.feed(f, vad(f)) for f in frames(tone(500, 0) + tone(60, 9000) + tone(1500, 0))]
 check("60 ms click never starts an utterance", ep.started, False)
+
+# a 90 ms click (under the 150 ms minimum) starts an utterance but is too short: it's dropped and the timeout still works
+import queue
+q = queue.Queue()
+for f in frames(tone(200, 0) + tone(90, 9000) + tone(2500, 0)):
+    q.put(f)
+t0 = time.time()
+check("short blip alone -> None (not a 30 s wait)", fast_stt.record(q, timeout=0.5, vad=fast_stt.EnergyVAD(), end_ms=450), None)
+check("...and returns quickly", time.time() - t0 < 2.5, True)
+q = queue.Queue()
+for f in frames(tone(200, 0) + tone(90, 9000) + tone(800, 0) + tone(900, 8000) + tone(1500, 0)):
+    q.put(f)
+pcm = fast_stt.record(q, timeout=3, vad=fast_stt.EnergyVAD(), end_ms=450)
+check("blip then a real command -> the command", bool(pcm) and len(pcm) < len(tone(900 + 300 + 500, 1)), True)
+q = queue.Queue()
+for f in frames(tone(180, 9000) + tone(2500, 0)):            # her chime, right as listening starts
+    q.put(f)
+check("her own chime is skipped", fast_stt.record(q, timeout=0.5, vad=fast_stt.EnergyVAD(), skip_ms=220), None)
+q = queue.Queue()
+for f in frames(tone(300, 0) + tone(200, 8000) + tone(1500, 0)):   # a quick "no"
+    q.put(f)
+check("a short 'no' (200 ms) still counts", bool(fast_stt.record(q, timeout=2, vad=fast_stt.EnergyVAD(), skip_ms=220)), True)
 
 # the endpoint timeout: nobody speaks
 import queue

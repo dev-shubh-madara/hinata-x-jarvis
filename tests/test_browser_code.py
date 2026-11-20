@@ -104,7 +104,11 @@ try:
     config.BROWSER_AGENT_CHANNEL = ""
     config.BROWSER_HEADLESS = True
     browser.register()
-    check("open", browser.open_page(url), "Opened Shop.")
+    try:
+        first = browser.open_page(url)
+    except Exception as e:                      # no Playwright / no Chromium on this machine
+        raise ImportError(e)
+    check("open", first, "Opened Shop.")
     check("read the page", "Your cart has 1 item." in browser.read(), True)
     check("type into a labelled box", browser.type_text("search", "headphones"), "Typed it.")
     check("value really typed", browser._w.call(lambda w: w.page.input_value("#q")), "headphones")

@@ -12,7 +12,7 @@
 ![License](https://img.shields.io/badge/License-MIT-ff9ad5)
 [![Stars](https://img.shields.io/github/stars/dev-shubh-madara/hinata-x-jarvis?style=social)](https://github.com/dev-shubh-madara/hinata-x-jarvis/stargazers)
 
-### Press a hotkey. Say what you want. It's done. On your PC *and* your phone.
+### Say "Hinata". Say what you want. It's done. On your PC *and* your phone.
 
 **Hinata** is a voice assistant in the spirit of JARVIS and FRIDAY. She runs on a **local AI**, so there's no API key, no cloud bill and no usage limit. She controls your Windows PC and your Android phone, looks at your screen, makes phone calls for you, and lives inside a real-time 3D hologram.
 
@@ -55,11 +55,11 @@
 | **Brain** | Local LLM through Ollama, on your own GPU | A remote API |
 | **Cost** | Free, no API key | Paid tokens or a subscription |
 | **Privacy** | Commands and screenshots stay on your PC* | Sent to a server |
-| **PC control** | 39 tools plus PowerShell, with multi-step chaining | Limited or none |
+| **PC control** | ~60 tools plus PowerShell and MCP plug-ins, with multi-step chaining | Limited or none |
 | **Phone control** | Full Android control over Wireless debugging | Usually none |
 | **Looks** | Live 3D hologram HUD | A chat box |
 
-<sub>*Speech-to-text (Google), the neural voice, weather and news use the internet. You can switch speech-to-text to offline Whisper.</sub>
+<sub>*Speech-to-text and the wake word run offline on your GPU. The neural voice, weather and news use the internet; if the internet drops she switches to an offline voice.</sub>
 
 ---
 
@@ -106,6 +106,10 @@
 <td valign="top">
 
 ### ⚡ Fast and smooth
+- **Wake word:** say *"Hinata"*, or *"Hinata, open Chrome"* in one breath
+- **Always-on mic + voice detection:** she acts ~0.4 s after your last word
+- **Whisper on your GPU** for speech, offline (~0.2 s)
+- **Streaming replies:** she starts talking after the first sentence
 - Common commands skip the AI and run in **under 0.3 s**
 - Model preloaded and kept warm, with an app and file index built at startup
 - The hologram renders in **its own process**, so the window never stutters
@@ -125,6 +129,19 @@
 - **WhatsApp by name:** *"WhatsApp Vishal saying I'm on my way"*. No number, no country code. If two chats match, she asks which one.
 - **Skills folder:** drop a `.md` or `.py` file into `Hinata_Output\Skills` and she can do a new job straight away.
 - **Bigger brain for big jobs (optional):** say *"add my API key"* for Claude, Gemini or Groq, or keep everything local with `qwen2.5-coder:7b`.
+
+### 🧬 New in 2.0: faster and stronger
+
+| | What changed |
+|---|---|
+| **Speed** | One always-open mic, voice detection instead of a fixed 1.5 s wait, Whisper on the GPU, streamed replies, and the next sentence's audio made while the current one plays |
+| **Smarter prompts** | Each request gets only the tools it needs. The full list was bigger than the model's context window, so the start of the prompt used to get cut off |
+| **Memory** | *"remember that my exam starts on 24 November"*. She uses it later without being asked |
+| **Every file, instantly** | *"open my physics ppt from last week"*. All drives indexed, about 20 ms per search |
+| **Browser** | *"go to GitHub and click sign in"*. She drives her own Chrome window: read, click, type, tabs |
+| **Coding** | *"read this error and fix it"*. Reads the traceback off your screen, finds the file, shows the fix in VS Code and saves only on "confirm" |
+| **Plug-ins (MCP)** | Any MCP server (the same ones Claude Desktop uses) becomes new tools. Add it to `mcp_servers.json`, say *"reload my plugins"* |
+| **Offline voice** | Kokoro runs on the laptop when the internet drops |
 
 ---
 
@@ -172,12 +189,13 @@ Run `uninstall_autostart.bat` to turn it off. Only one Hinata can run at a time,
 
 | Hotkey | Action |
 |---|---|
+| Say **"Hinata"** | Wakes her. *"Hinata, play lofi"* works in one breath |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd> | **Speak** a command |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>J</kbd> | **Type** a command (quiet room, or the fastest option) |
 | Right-click the **hologram** | Sends it back to the small orb (she keeps running) |
 | Right-click the **orb** | Menu: talk, type, or quit |
 
-**Speak naturally.** She waits about **1.5 seconds of silence** before acting. If she cuts you off, raise `END_OF_SPEECH_PAUSE` in `config.py`.
+**Speak naturally.** She acts about **0.4 seconds** after your last word. If she cuts you off, raise `END_SILENCE_MS` in `config.py`.
 
 ### Things to say
 
@@ -198,6 +216,12 @@ Run `uninstall_autostart.bat` to turn it off. Only one Hinata can run at a time,
 | "on my phone open WhatsApp, tap Vishal, type hi" | Does it on the phone |
 | **"order chicken biryani on Swiggy"** | Gets to the cart and asks before paying |
 | **"call mom and tell her I'll be late today"** | Makes the call and does the talking |
+| **"remember that my mentor is Rasmita"** | Saved for good; she uses it when it matters |
+| **"open my physics ppt from last week"** | Finds it on any drive and opens it |
+| **"go to github and open my repositories"** | Drives her Chrome window |
+| **"read this error and fix it"** | Fix shown in VS Code, saved on "confirm" |
+| "what's 2 to the power 64" | Writes and runs Python for the exact answer |
+| "reload my plugins" | Starts your MCP servers |
 | "shut down" → **"confirm"** | Power actions always ask first |
 
 ### 💬 Conversation mode
@@ -258,7 +282,8 @@ She **always says she's an AI assistant**, and only calls after you say "confirm
 
 ```mermaid
 flowchart LR
-    K([Hotkey]) --> L[hotkey_listener<br/>mic + speech-to-text]
+    W([Wake word]) --> L
+    K([Hotkey]) --> L[hotkey_listener + fast_stt<br/>always-on mic, VAD, whisper]
     L --> S{session<br/>chat or work?}
     S --> R[commands<br/>router]
     R -->|confirm / cancel| C[(pending<br/>actions)]
@@ -266,9 +291,11 @@ flowchart LR
     R -->|phone| A[phone_control<br/>ADB]
     R -->|screen| V[vision<br/>local VLM]
     R -->|calls| CA[call_agent]
-    R -->|everything else| N[nlu<br/>Ollama agent · 39 tools]
+    R -->|everything else| N[nlu<br/>Ollama agent · routed tools]
+    N --> M[memory · files · browser<br/>coder · MCP plug-ins]
     N --> P & A & V & CA
-    R --> T[tts_engine<br/>neural voice]
+    N -. streamed sentences .-> T
+    R --> T[tts_engine<br/>neural / offline voice]
     S --> O[overlay + hud3d<br/>3D hologram]
     O -. shared memory .- H[hud_proc<br/>render process]
 ```
@@ -294,10 +321,13 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 |---|---|---|
 | `USER_NAME` / `USER_TITLE` | `"Shubh"` / `"Boss"` | Your name, and what she calls you |
 | `HOTKEY` / `TYPE_HOTKEY` | `ctrl+shift+h` / `ctrl+shift+j` | Avoid Alt+Space, because Windows opens a window menu |
-| `END_OF_SPEECH_PAUSE` | `1.5` | Seconds of silence before she acts |
+| `WAKE_WORD` / `WAKE_WORDS` | `True` / `["hinata", "jarvis"]` | Hands-free wake word, offline |
+| `END_SILENCE_MS` | `450` | Silence after your last word before she acts |
 | `FAST_MODEL` | `qwen2.5:3b` | Small, fast brain, downloaded once automatically (leaves GPU room for vision) |
 | `NEURAL_VOICE` | `en-IN-NeerjaNeural` | Try `en-US-AriaNeural` or `hi-IN-SwaraNeural` |
-| `STT_ENGINE` | `"google"` | `"whisper"` for offline speech on your GPU |
+| `STT_ENGINE` | `"fast"` | Always-on mic + Whisper on the GPU; `"google"` for the old online path |
+| `TTS_ENGINE` | `"neural"` | `"kokoro"` for the offline voice |
+| `AI_CONTEXT` | `8192` | Tokens the model sees at once |
 | `OLLAMA_MODEL` | `""` (auto) | Any model from `ollama list` |
 | `VISION_MODEL` | `qwen2.5vl:3b` | Downloaded automatically the first time you ask |
 | `CONVERSATION_MODE` | `True` | `False` closes after every command |
@@ -310,7 +340,10 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 
 ## 🛡️ Safety (built in)
 
-- 🎧 She listens **only after you press the hotkey**. Nothing runs in the background.
+- 🎧 **Wake word:** the microphone stays open so she can hear "Hinata". The audio never leaves your laptop. Short phrases are transcribed on your GPU and thrown away unless they start with her name. Set `WAKE_WORD = False` (and `STT_ENGINE = "google"`) to go back to hotkey-only listening.
+- 🌐 **Browser:** she never types into password, card, CVV or OTP boxes, and asks before clicking Pay, Buy, Send, Delete or Post.
+- 🧑‍💻 **Code:** snippets that touch files outside `Hinata_Output\Code`, run programs or use the network ask first. Fixes are shown as a diff and saved only on "confirm", with a `.bak` copy.
+- 🧩 **Plug-ins:** MCP tools that write, send or delete ask first unless you mark the server `"trusted": true`.
 - ✅ Shut down, restart, deletes (to the Recycle Bin), calls, SMS and any risky PowerShell **need a spoken "confirm"** within 25 seconds.
 - 💳 **Payment lock:** buttons like *Pay* and *Place order* are detected on the phone screen and blocked until you say **"confirm"**. "Yes" is not enough. UPI PINs and lock-screen PINs are **never** typed.
 - 📞 AI calls always introduce themselves as an **AI assistant**.
@@ -324,10 +357,20 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 hinata-x-jarvis/
 ├── main.py            # starts everything: log, HUD, warm-up, voice loop
 ├── config.py          # every setting
-├── hotkey_listener.py # global hotkeys, mic, speech-to-text
+├── hotkey_listener.py # global hotkeys, triggers
+├── fast_stt.py        # always-on mic, voice detection, whisper on the GPU
+├── wake.py            # "Hinata" wake word
+├── kokoro_tts.py      # offline voice
+├── memory.py          # long-term memory
+├── file_index.py      # all-drives file index (SQLite, trigram search)
+├── browser.py         # drives a Chrome window
+├── screen.py          # exact screen text (Windows OCR)
+├── coder.py           # run Python, fix files, VS Code
+├── mcp_client.py      # MCP plug-ins
+├── powers.py          # loads the modules above as AI tools
 ├── session.py         # conversation mode (chat vs work)
 ├── commands.py        # the router: confirms, fast paths, phone, AI fallback
-├── nlu.py             # local Ollama agent - 39 tools, multi-step
+├── nlu.py             # local Ollama agent - tool routing, streaming, multi-step
 ├── pc_actions.py      # everything on Windows + PowerShell safety gate
 ├── phone_control.py   # Android over ADB: tap by text, type, call, SMS, food, payment lock
 ├── phone_pair.py      # Hinata Link setup, pairing code / QR, auto-reconnect
@@ -388,7 +431,7 @@ GitHub Actions runs them on every push.
 ## ❓ FAQ
 
 <details><summary><b>Does it work without internet?</b></summary>
-The AI brain, PC control and phone control all work offline. For speech, set <code>STT_ENGINE = "whisper"</code> (<code>pip install faster-whisper</code>). The voice falls back to the built-in Windows voice.
+Yes for the important parts: the AI brain, speech-to-text, the wake word, PC control and phone control all run offline. The neural voice needs the internet; without it she switches to the offline Kokoro voice (say "download the offline voice" once), then the built-in Windows voice.
 </details>
 
 <details><summary><b>Which model should I use?</b></summary>
@@ -396,7 +439,7 @@ The AI brain, PC control and phone control all work offline. For speech, set <co
 </details>
 
 <details><summary><b>Is my data sent anywhere?</b></summary>
-Commands are understood by your local model. Screenshots for vision go to your local vision model. Only speech-to-text (Google, unless you use Whisper), the neural voice and live info use the internet.
+Commands are understood by your local model and your speech is transcribed on your GPU. Screenshots go to your local vision model or Windows' own OCR. Only the neural voice text, live info and sites you ask her to open use the internet.
 </details>
 
 <details><summary><b>Can she pay for things on her own?</b></summary>
@@ -411,9 +454,10 @@ PC control targets Windows today. The tests already run on Linux, and ports are 
 
 ## 🗺️ Roadmap
 
-- [ ] Wake word ("Hey Hinata") as an optional alternative to the hotkey
-- [ ] Memory of preferences across sessions
-- [ ] Plugin system for community tools
+- [x] Wake word ("Hey Hinata") as an alternative to the hotkey
+- [x] Memory of preferences across sessions
+- [x] Plugin system for community tools (MCP)
+- [ ] Hindi wake word and Hinglish speech model
 - [ ] Linux and macOS PC-control backends
 - [ ] More HUD themes
 - [ ] Hindi-first conversation mode

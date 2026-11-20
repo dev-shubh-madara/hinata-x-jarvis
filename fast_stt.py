@@ -69,7 +69,7 @@ class Endpointer:
     end:   end_ms of silence after at least min_speech_ms of speech
     """
 
-    def __init__(self, end_ms=None, min_speech_ms=240, preroll_ms=300, max_ms=None):
+    def __init__(self, end_ms=None, min_speech_ms=150, preroll_ms=300, max_ms=None):
         self.end_frames = max(1, int((end_ms or config.END_SILENCE_MS) / FRAME_MS))
         self.min_frames = max(1, int(min_speech_ms / FRAME_MS))
         self.max_frames = int((max_ms or config.PHRASE_TIME_LIMIT * 1000) / FRAME_MS)
@@ -98,7 +98,17 @@ class Endpointer:
             self.silence += 1
         if len(self.frames) >= self.max_frames:
             return True
+        if self.voiced < self.min_frames and self.silence >= self.end_frames:
+            self._reset()                    # a chime, cough or click - not a command, keep waiting
+            return False
         return self.voiced >= self.min_frames and self.silence >= self.end_frames
+
+    def _reset(self):
+        self.started = False
+        self.frames = []
+        self.voiced = 0
+        self.silence = 0
+        self.window.clear()
 
     def audio(self) -> bytes:
         # trim the trailing silence - whisper is faster on shorter audio
@@ -178,10 +188,12 @@ def mic() -> MicStream:
 
 
 def record(frames: "queue.Queue", timeout: float, vad=None, end_ms=None, max_ms=None,
-           stop=lambda: False) -> bytes | None:
-    """Reads frames until one utterance is complete. None if nobody spoke within timeout."""
+           stop=lambda: False, skip_ms: int = 0) -> bytes | None:
+    """Reads frames until one utterance is complete. None if nobody spoke within timeout.
+    skip_ms: ignore the start (e.g. her own chime) before listening."""
     vad = vad or make_vad()
     ep = Endpointer(end_ms=end_ms, max_ms=max_ms)
+    skip = max(0, int(skip_ms / FRAME_MS))
     t_end = time.time() + timeout
     while True:
         if stop():
@@ -191,6 +203,9 @@ def record(frames: "queue.Queue", timeout: float, vad=None, end_ms=None, max_ms=
         except queue.Empty:
             if not ep.started and time.time() > t_end:
                 return None
+            continue
+        if skip:
+            skip -= 1
             continue
         if ep.feed(frame, vad(frame)):
             return ep.audio()
@@ -267,7 +282,7 @@ def clean(text: str) -> str:
     return t
 
 
-def listen(timeout: float, stop=lambda: False) -> str | None:
+def listen(timeout: float, stop=lambda: False, skip_ms: int = 220) -> str | None:
     """One spoken command from the always-on mic. Returns text or None."""
     m = mic()
     if not m.start():
@@ -275,7 +290,7 @@ def listen(timeout: float, stop=lambda: False) -> str | None:
     q = m.subscribe()
     try:
         t0 = time.perf_counter()
-        pcm = record(q, timeout, stop=stop)
+        pcm = record(q, timeout, stop=stop, skip_ms=skip_ms)
         if pcm is None:
             print("[mic] Heard nothing.")
             return None
