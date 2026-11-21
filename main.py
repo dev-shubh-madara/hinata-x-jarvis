@@ -25,6 +25,7 @@ except ImportError:
 import config
 import commands
 import hotkey_listener
+import quick
 import nlu
 import phone_control
 import phone_pair
@@ -118,6 +119,8 @@ def _run(overlay, text: str):
     overlay.set_caption(reply=reply or "", ms=first["t"] or ms)
     if reply and commands.already_spoken():
         tts_engine.wait_idle()               # already said while streaming - just let her finish
+    elif reply and outcome == "action" and getattr(config, "SILENT_ACTIONS", False) and not quick.needs_voice(reply):
+        tts_engine.tick()                    # background mode: the work is the answer
     elif reply:
         overlay.set_state("speaking")
         speak(reply)
@@ -158,7 +161,7 @@ def voice_loop(overlay: MicOverlay):
         try:
             _pause_wake(True)
             if kind == "voice" and recognizer is None and not fast:
-                overlay.expand()
+                overlay.force_expand()
                 overlay.set_state("speaking")
                 speak(f"I can't hear you - no microphone. Press {config.TYPE_HOTKEY.replace('+', ' ')} to type instead.")
                 continue
@@ -169,7 +172,7 @@ def voice_loop(overlay: MicOverlay):
                 ask_command=overlay.ask_command,
                 run_command=lambda text: _run(overlay, text),
                 speak=speak,
-                chime=tts_engine.chime,
+                chime=(lambda: None) if hotkey_listener.has_first_text() else tts_engine.chime,
                 drain=hotkey_listener.drain,
                 is_end=commands.is_end_phrase,
                 conversation_mode=config.CONVERSATION_MODE,

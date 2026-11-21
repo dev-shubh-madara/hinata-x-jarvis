@@ -343,6 +343,13 @@ class MicOverlay:
         self.root.after(0, run)
 
     def expand(self):
+        """Full-screen hologram - only if it's switched on (config.HOLOGRAM_ON_WAKE).
+        In background mode she just lights up the small orb and leaves your screen alone."""
+        if getattr(config, "HOLOGRAM_ON_WAKE", True):
+            self.root.after(0, self._do_expand)
+
+    def force_expand(self):
+        """Always opens the full-screen hologram ("show hologram")."""
         self.root.after(0, self._do_expand)
 
     def collapse(self):

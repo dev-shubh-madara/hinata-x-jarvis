@@ -10,7 +10,9 @@ and checked for her name at the start. Two ways to use it:
                                           no second sentence needed
 
 Only the first few words count, so a video or a friend saying "Hinata"
-mid-sentence doesn't wake her. She ignores the mic while she's talking,
+mid-sentence doesn't wake her. In listen mode (quick.py) her name isn't
+needed: any sentence that starts like a command ("open...", "type...",
+"enter") runs, and everything else is ignored. She ignores the mic while she's talking,
 so her own voice can't wake her either. Works fully offline.
 """
 
@@ -39,7 +41,9 @@ def _close(word: str, name: str) -> bool:
 
 def match(text: str):
     """None if the text doesn't start with her name, else the rest of the command ('' if just her name)."""
-    words = re.sub(r"[^a-z0-9' ]", " ", (text or "").lower()).split()
+    text = text or ""
+    toks = [(m.group(0).lower(), m.start(), m.end()) for m in re.finditer(r"[A-Za-z0-9']+", text)]
+    words = [w for w, _, _ in toks]
     i = 0
     while i < len(words) and words[i] in _FILLERS and i < 2:
         i += 1
@@ -49,19 +53,62 @@ def match(text: str):
             two = one + (words[j + 1] if j + 1 < len(words) else "")   # "hi nata" -> "hinata"
             for cand, used in ((one, 1), (two, 2)):
                 if _close(cand, name):
-                    rest_words = words[j + used:]
-                    while rest_words and rest_words[0] in ("x", "helper"):
-                        rest_words = rest_words[1:]
-                    # keep the user's original casing / punctuation for the rest
-                    return _tail(text, len(rest_words))
+                    k = j + used
+                    while k < len(words) and words[k] in ("x", "helper"):
+                        k += 1
+                    return _from(text, toks, k)
     return None
 
 
-def _tail(text: str, n_words: int) -> str:
-    if n_words <= 0:
+def _from(text: str, toks, k: int) -> str:
+    """The original text from token k on, with its casing and punctuation."""
+    if k >= len(toks):
         return ""
-    parts = (text or "").strip().split()
-    return " ".join(parts[-n_words:]).strip(" ,.!?")
+    return text[toks[k][1]:].strip(" ,.!?")
+
+
+def _sounds_like_name(words) -> bool:
+    """'and not to' / 'renata' / 'in a ta' - how speech-to-text mishears 'Hinata' after a pause."""
+    joined = re.sub(r"[^a-z]", "", "".join(words))
+    if len(joined) < 4:
+        return False
+    vowels = lambda x: re.sub(r"[aeiouy]+", "a", x).lstrip("h")       # noqa: E731
+    for name in _names():
+        if difflib.SequenceMatcher(None, vowels(joined), vowels(name)).ratio() >= 0.76:
+            return True
+    return False
+
+
+def fuzzy_match(text: str):
+    """Second chance when the name was misheard: 1-3 name-like words, then a real command word.
+    The command word is what keeps ordinary talk from waking her."""
+    import quick
+    text = text or ""
+    toks = [(m.group(0).lower(), m.start(), m.end()) for m in re.finditer(r"[A-Za-z0-9']+", text)]
+    words = [w for w, _, _ in toks]
+    for n in (1, 2, 3):
+        if len(words) <= n:
+            break
+        rest = _from(text, toks, n)
+        if _sounds_like_name(words[:n]) and quick.looks_like_command(rest):
+            return rest
+    return None
+
+
+def decide(text: str):
+    """What to run for this sentence: the command after her name, or - in listen mode -
+    the whole sentence if it starts like a command. None = not for her."""
+    import quick
+    rest = match(text)
+    if rest is None:
+        rest = fuzzy_match(text)
+    if rest is not None:
+        quick.keep_alive()
+        return rest
+    if quick.in_listen_mode() and quick.looks_like_command(text):
+        quick.keep_alive()
+        return text.strip()
+    return None
 
 
 def pause():
@@ -95,13 +142,13 @@ def _loop(m, fire, is_speaking):
             _drain(q)
             time.sleep(0.05)
             continue
-        pcm = fast_stt.record(q, timeout=3600, vad=vad, end_ms=500, max_ms=12000, stop=busy)
+        pcm = fast_stt.record(q, timeout=3600, vad=vad, end_ms=config.END_SILENCE_MS, max_ms=12000, stop=busy)
         if pcm is None or busy():
             continue
         if len(pcm) < fast_stt.RATE * 2 * 0.25:                         # under 0.25 s: a click, not a word
             continue
-        text = fast_stt.transcribe(pcm, prompt="Hinata. Hey Hinata, open Chrome.")
-        rest = match(text or "")
+        text = fast_stt.transcribe(pcm, prompt="Hinata, open Notepad. Hinata, type hello. Hinata, enter. Hinata, new line. Hinata, go to Slack.")
+        rest = decide(text or "")
         if rest is None:
             continue
         if time.time() - _state["fired"] < 1.0:

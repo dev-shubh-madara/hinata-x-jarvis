@@ -298,3 +298,36 @@ def chime():
         winsound.PlaySound(_chime_path(), winsound.SND_FILENAME | winsound.SND_ASYNC)
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------- tick (background mode "done")
+
+def _tick_path() -> str:
+    path = os.path.join(config.DATA_DIR, "tick.wav")
+    if not os.path.exists(path):
+        import math
+        import struct
+        import wave
+        rate = 22050
+        frames = []
+        for i in range(int(rate * 0.07)):
+            t = i / rate
+            env = math.exp(-t * 60)
+            frames.append(int(9000 * env * math.sin(2 * math.pi * 1320 * t)))
+        with wave.open(path, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(struct.pack(f"<{len(frames)}h", *frames))
+    return path
+
+
+def tick():
+    """A soft 70 ms 'done' sound."""
+    if not getattr(config, "CHIME", True):
+        return
+    try:
+        import winsound
+        winsound.PlaySound(_tick_path(), winsound.SND_FILENAME | winsound.SND_ASYNC)
+    except Exception:
+        pass

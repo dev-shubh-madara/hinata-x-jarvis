@@ -55,6 +55,10 @@ def wait_for_trigger() -> str:
     return kind
 
 
+def has_first_text() -> bool:
+    return bool(_first["text"])
+
+
 def take_first_text() -> str:
     """The command said in the same breath as the wake word, once."""
     t, _first["text"] = _first["text"], ""

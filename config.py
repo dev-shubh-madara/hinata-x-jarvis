@@ -107,6 +107,14 @@ MOTION_AUTO_SAVE = False       # False = preview in the studio only; the MP4 is 
 AUTO_RUN_SAFE_COMMANDS = True
 CONFIRM_SECONDS = 25
 
+# ---- Background mode -----------------------------------------------------------------
+# She works without covering your screen: no full-screen hologram, no "Done" after every
+# action - the keys just go to the window you're in. Say "show hologram" to bring the
+# full-screen 3D one back (and "hologram off" to hide it again).
+HOLOGRAM_ON_WAKE = False
+SILENT_ACTIONS = True          # don't say "Opening Chrome" etc. - a soft tick instead (errors are still spoken)
+LISTEN_MODE_IDLE_MINUTES = 2   # "listen mode" (no wake word needed) ends after this much quiet
+
 # ---- 3D HUD -------------------------------------------------------------------------
 HUD_QUALITY = "auto"           # "auto" (adapts to your PC), "ultra", "high", "medium", "low"
 HUD_TARGET_FPS = 90            # she lowers the render size by herself to hold this

@@ -130,6 +130,23 @@
 - **Skills folder:** drop a `.md` or `.py` file into `Hinata_Output\Skills` and she can do a new job straight away.
 - **Bigger brain for big jobs (optional):** say *"add my API key"* for Claude, Gemini or Groq, or keep everything local with `qwen2.5-coder:7b`.
 
+### 🫥 Background mode (default)
+
+Hinata stays out of your way. No full-screen hologram, no "Done" after every action: say her name and the command, and it happens in the window you're already in.
+
+| Say | What happens |
+|---|---|
+| "Hinata, open Notes" | Notepad opens |
+| "Hinata, type this is a demo" | Typed into the window you're in (long text is pasted in one go) |
+| "Hinata, enter" · "Hinata, new line" | Enter · Shift+Enter (a new line that doesn't send in chat apps) |
+| "Hinata, go to Slack" | Brings Slack to the front (opens it if it isn't running) |
+| "Hinata, select all" · "copy" · "paste" · "undo" · "delete that" | The shortcut, instantly |
+| "Hinata, type see you full stop" | Spoken punctuation: full stop, comma, question mark |
+| **"Hinata, listen mode"** | No name needed for the next commands; normal talk is ignored. "Stop listening" ends it |
+| **"Hinata, show hologram"** | Brings the full-screen 3D hologram back. "Hologram off" hides it |
+
+Problems and questions are still spoken out loud; finished work is just a soft tick.
+
 ### 🧬 New in 2.0: faster and stronger
 
 | | What changed |
@@ -323,6 +340,8 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 | `HOTKEY` / `TYPE_HOTKEY` | `ctrl+shift+h` / `ctrl+shift+j` | Avoid Alt+Space, because Windows opens a window menu |
 | `WAKE_WORD` / `WAKE_WORDS` | `True` / `["hinata", "jarvis"]` | Hands-free wake word, offline |
 | `END_SILENCE_MS` | `450` | Silence after your last word before she acts |
+| `HOLOGRAM_ON_WAKE` | `False` | `True` opens the full-screen hologram every time (or say "show hologram") |
+| `SILENT_ACTIONS` | `True` | `False` makes her say "Opening Chrome" etc. again |
 | `FAST_MODEL` | `qwen2.5:3b` | Small, fast brain, downloaded once automatically (leaves GPU room for vision) |
 | `NEURAL_VOICE` | `en-IN-NeerjaNeural` | Try `en-US-AriaNeural` or `hi-IN-SwaraNeural` |
 | `STT_ENGINE` | `"fast"` | Always-on mic + Whisper on the GPU; `"google"` for the old online path |
@@ -368,6 +387,7 @@ hinata-x-jarvis/
 ├── coder.py           # run Python, fix files, VS Code
 ├── mcp_client.py      # MCP plug-ins
 ├── powers.py          # loads the modules above as AI tools
+├── quick.py           # instant keys/typing, "go to <app>", listen mode
 ├── session.py         # conversation mode (chat vs work)
 ├── commands.py        # the router: confirms, fast paths, phone, AI fallback
 ├── nlu.py             # local Ollama agent - tool routing, streaming, multi-step

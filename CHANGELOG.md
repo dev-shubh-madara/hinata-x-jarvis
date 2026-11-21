@@ -39,3 +39,14 @@
 - Screen OCR with the Windows OCR engine; error detection from screen text.
 - Coding helper: run Python snippets, fix a file from its traceback with a diff in VS Code, "read this error and fix it".
 - MCP plug-ins from `mcp_servers.json`; writes need "confirm" unless the server is trusted.
+
+## 2.1.0
+- Background mode is the default: the full-screen hologram only opens when you say "show hologram" (or set `HOLOGRAM_ON_WAKE`).
+- Finished actions are silent with a soft tick; problems and questions are still spoken.
+- Instant hands-free commands with no AI: type, enter, new line, select all, copy, paste, undo, delete that, tabs, zoom, and more.
+- "Go to <app>" brings a running window to the front by title or program, or opens it.
+- Long dictation is pasted in one go and your clipboard is put back.
+- Spoken punctuation; the automatic full stop from speech-to-text isn't typed.
+- Listen mode: commands without the wake word until "stop listening" or two quiet minutes; chatter that doesn't start like a command is ignored.
+- Wake word survives common mishearings after a pause ("and not to type...") when a real command word follows.
+- "Hinata, open Chrome" in one breath no longer plays the listening chime.

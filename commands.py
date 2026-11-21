@@ -486,6 +486,9 @@ def _presentation(topic: str, slides: int = 6) -> str:
 
 def _fast_path(t: str, raw: str):
     """Common commands with zero AI delay. Returns a reply or None."""
+    import quick
+    if (r := quick.match(t, raw)) is not None:
+        return r
     if t in ("stop", "quiet", "shut up", "be quiet", "stop talking", "chup"):
         return _info("")
     if re.search(r"\b(what(?:'s| is) the (?:time|date)|what time is it|today'?s date|time now|kya time)\b", t):
@@ -503,7 +506,10 @@ def _fast_path(t: str, raw: str):
             m.group(1).replace(" settings", "") in pc.SETTINGS_PAGES:
         return pc.open_settings(m.group(1).replace(" settings", ""))
     if (m := re.fullmatch(r"(?:open|launch|start|kholo) (.+)", t)):
-        return pc.open_target(m.group(1))
+        name = _keep(raw.strip().rstrip(".!"), m.group(1))
+        if name.lower() in ("note", "notes", "notepad", "a note"):
+            name = "notepad"                          # "open notes" = a page to type on
+        return pc.open_target(name)
     if (m := re.fullmatch(r"(?:close|quit|exit|band karo) (.+)", t)):
         return pc.close_app(m.group(1))
     if (m := re.fullmatch(r"(?:search|google)(?: for)? (.+)", t)):
@@ -605,6 +611,30 @@ def handle(text: str) -> str:
     r = _resolve_pending(t)
     if r is not None:
         return r
+
+    # ---- background mode: listen mode + hologram on/off
+    if re.fullmatch(r"(?:start |turn on |enable |go into |enter )?(?:listen(?:ing)?|dictation|hands[- ]free|command) mode(?: on)?|"
+                    r"keep listening|listen to (?:me|everything)|stay (?:on|awake)", t):
+        import quick
+        quick.listen_mode(True)
+        return _info("Listen mode on. Just say the command - no need for my name. Say stop listening when you're done.")
+    if re.fullmatch(r"(?:stop listening|listen(?:ing)? mode off|(?:turn off|exit|stop|end) (?:listen(?:ing)?|dictation|"
+                    r"hands[- ]free|command) mode)", t):
+        import quick
+        quick.listen_mode(False)
+        return _info("Okay, I'll wait for my name.")
+    if re.fullmatch(r"(?:show|open|turn on|start|enable)(?: me)?(?: your| the)? (?:hologram|full ?screen(?: mode)?|hud|3d(?: mode)?)(?: on)?|"
+                    r"hologram on|show yourself|full ?screen mode", t):
+        config.HOLOGRAM_ON_WAKE = True
+        if _overlay:
+            getattr(_overlay, "force_expand", _overlay.expand)()
+        return _info("Hologram on.")
+    if re.fullmatch(r"(?:hide|close|turn off|stop|disable)(?: your| the)? (?:hologram|full ?screen(?: mode)?|hud|3d(?: mode)?)|"
+                    r"hologram off|quiet mode|background mode", t):
+        config.HOLOGRAM_ON_WAKE = False
+        if _overlay:
+            _overlay.collapse()
+        return _info("Hologram off. I'll work quietly in the background.")
 
     # ---- long-term memory
     if (m := _REMEMBER.match(t)):
