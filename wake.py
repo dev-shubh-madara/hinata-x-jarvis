@@ -95,8 +95,8 @@ def fuzzy_match(text: str):
     return None
 
 
-_BARE = re.compile(r"^(?:open|launch|start|close|type|write|dictate|go to|switch to|play|search|search for|google|"
-                   r"find|send|message|call|remind me|set|turn on|turn off|show|hinata)$", re.I)
+_BARE = re.compile(r"^(?:open|launch|start|close|type|write|dictate|go|go to|switch|switch to|bring up|focus|play|"
+                   r"search|search for|google|find|send|message|call|remind me|set|turn on|turn off|show|hinata)$", re.I)
 
 
 def incomplete(rest: str) -> bool:
