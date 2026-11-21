@@ -618,11 +618,15 @@ def handle(text: str) -> str:
         import quick
         quick.listen_mode(True)
         return _info("Listen mode on. Just say the command - no need for my name. Say stop listening when you're done.")
+    import quick as _q
+    if _q.in_listen_mode() and _q.is_rest(t):
+        _q.listen_mode(False)
+        return _info("Okay, resting. Say Hey Hinata when you need me.")
     if re.fullmatch(r"(?:stop listening|listen(?:ing)? mode off|(?:turn off|exit|stop|end) (?:listen(?:ing)?|dictation|"
                     r"hands[- ]free|command) mode)", t):
         import quick
         quick.listen_mode(False)
-        return _info("Okay, I'll wait for my name.")
+        return _info("Okay, resting. Say Hey Hinata when you need me.")
     if re.fullmatch(r"(?:show|open|turn on|start|enable)(?: me)?(?: your| the)? (?:hologram|full ?screen(?: mode)?|hud|3d(?: mode)?)(?: on)?|"
                     r"hologram on|show yourself|full ?screen mode", t):
         config.HOLOGRAM_ON_WAKE = True

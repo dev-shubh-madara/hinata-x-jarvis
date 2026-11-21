@@ -232,14 +232,20 @@ def _bring_front(hwnd):
 
 # ---------------------------------------------------------------- listen mode
 
-_listen = {"until": 0.0}
+_listen = {"until": 0.0, "awake": False}
 
 
-def listen_mode(on: bool):
+def listen_mode(on: bool, awake: bool = False):
+    """on: take commands without her name. awake=True is "Hey Hinata" mode: questions too,
+    and it lasts until "get back to rest" (or AWAKE_IDLE_MINUTES of quiet, if set)."""
+    _listen["awake"] = bool(on and awake)
     _listen["until"] = time.time() + _idle() if on else 0.0
 
 
 def _idle() -> float:
+    if _listen["awake"]:
+        mins = float(getattr(config, "AWAKE_IDLE_MINUTES", 0) or 0)
+        return 60 * mins if mins > 0 else 10 * 365 * 86400          # 0 = until told to rest
     return 60 * float(getattr(config, "LISTEN_MODE_IDLE_MINUTES", 2))
 
 
@@ -247,10 +253,36 @@ def in_listen_mode() -> bool:
     return time.time() < _listen["until"]
 
 
+def is_awake() -> bool:
+    return in_listen_mode() and _listen["awake"]
+
+
 def keep_alive():
     """Each command in listen mode pushes the idle cut-off back."""
     if in_listen_mode():
         _listen["until"] = time.time() + _idle()
+
+
+REST = re.compile(r"\b(?:(?:get|go)(?: back)? to (?:rest|sleep)|back to (?:rest|sleep)|(?:you can |now )?(?:rest|sleep) now|"
+                  r"take rest|go rest|you can (?:rest|go)|stop listening|that'?s all|we'?re done|"
+                  r"aaram karo|so jao)\b", re.I)
+
+
+def is_rest(text: str) -> bool:
+    return bool(REST.search(normalize(text)))
+
+
+QUESTION_START = re.compile(
+    r"^(what|what's|whats|who|who's|how|why|when|where|which|is|are|can|could|would|will|do|does|did|tell|"
+    r"give|make|create|build|write|set|remind|check|run|read|fix|explain|summari[sz]e|translate|calculate|"
+    r"remember|forget|call|message|whatsapp|email|draft|order|book|turn|put|add|remove|edit|cut|trim|"
+    r"start|download|install|update|show|look|clone|pair|connect)\b", re.I)
+
+
+def awake_accepts(text: str) -> bool:
+    """In "Hey Hinata" mode: commands and questions are hers; plain chatter isn't."""
+    t = normalize(text)
+    return bool(t) and len(t.split()) <= 40 and (looks_like_command(t) or bool(QUESTION_START.match(t)))
 
 
 def looks_like_command(text: str) -> bool:

@@ -44,6 +44,9 @@ MIC_DEVICE_INDEX = None        # None = Windows default microphone
 # Chrome" does it in one breath. Runs offline on the same always-on mic.
 WAKE_WORD = True
 WAKE_WORDS = ["hinata", "jarvis"]   # any of these at the start of a sentence wakes her
+# "Hey Hinata" on its own keeps her awake: she takes every command (no name needed) until you
+# say "okay, now get back to rest". 0 = stay awake until told; or minutes of silence before she rests.
+AWAKE_IDLE_MINUTES = 0
 
 # ---- Conversation mode ---------------------------------------------------------
 # While you're just talking (questions, chat - anything that needs no work on the
@@ -75,7 +78,8 @@ OLLAMA_MODEL = ""              # exact name from "ollama list", or "" to auto-pi
 FAST_MODEL = "qwen2.5:3b"      # preferred when OLLAMA_MODEL is blank - downloaded once automatically; "" = off
                                # fast + smart picks: qwen2.5:3b, qwen2.5:7b, llama3.2:3b
 AGENT_MAX_STEPS = 6            # how many actions the AI may chain for one request
-AI_CONTEXT = 8192              # tokens the model sees at once (prompt + tools + recent chat)
+AI_CONTEXT = 6144              # tokens the model sees at once (prompt + routed tools + recent chat).
+                               # Bigger uses more GPU memory; on a 6 GB card that can push the AI onto the CPU.
 AI_TEMPERATURE = 0.2
 
 # ---- Big jobs: motion videos, the desktop agent, website rebuild plans ---------------

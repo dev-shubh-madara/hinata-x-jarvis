@@ -52,3 +52,9 @@
 - "Hinata, open Chrome" in one breath no longer plays the listening chime.
 - Setup: `setup_hinata_v2.bat` (one click) and `restart_hinata.bat`.
 - If you pause right after the command word ("Hinata, open..."), she waits for the rest instead of acting on "open".
+- "Hey Hinata" on its own keeps her awake for every command and question until "okay, now get back to rest".
+- Speed: Whisper uses int8_float16 on the GPU (about half the memory of float16) and the AI context is 6144, so the
+  AI model is less likely to be pushed onto the CPU on a 6 GB card. A GPU check in the log shows how much of each
+  model is on the GPU; wake-word lines show how long transcription took.
+- PowerShell commands use `py -3` when `python` is only the Microsoft Store stub.
+- A long sentence after a bare "open" is no longer joined to it.

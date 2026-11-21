@@ -108,16 +108,28 @@ def decide(text: str):
     """What to run for this sentence: the command after her name, or - in listen mode -
     the whole sentence if it starts like a command. None = not for her."""
     import quick
+    if quick.in_listen_mode() and quick.is_rest(text):
+        return "stop listening"                     # "okay, now get back to rest"
     rest = match(text)
     if rest is None:
         rest = fuzzy_match(text)
     if rest is not None:
         quick.keep_alive()
         return rest
-    if quick.in_listen_mode() and quick.looks_like_command(text):
-        quick.keep_alive()
-        return text.strip()
+    if quick.in_listen_mode():
+        ok = quick.awake_accepts(text) if quick.is_awake() else quick.looks_like_command(text)
+        if ok:
+            quick.keep_alive()
+            return text.strip(" ,.")
     return None
+
+
+def _awake_sound():
+    try:
+        import tts_engine
+        tts_engine.chime()
+    except Exception:
+        pass
 
 
 def pause():
@@ -156,20 +168,29 @@ def _loop(m, fire, is_speaking):
             continue
         if len(pcm) < fast_stt.RATE * 2 * 0.25:                         # under 0.25 s: a click, not a word
             continue
+        t0 = time.perf_counter()
         text = fast_stt.transcribe(pcm, prompt="Hinata, open Notepad. Hinata, type hello. Hinata, enter. Hinata, new line. Hinata, go to Slack.")
+        took = (time.perf_counter() - t0) * 1000
         rest = decide(text or "")
         if rest is None:
+            continue
+        if rest == "" and getattr(config, "WAKE_STAYS_AWAKE", True):
+            import quick                              # "Hey Hinata" alone: stay awake until "get back to rest"
+            quick.listen_mode(True, awake=True)
+            _awake_sound()
+            print("[wake] awake - taking every command until 'get back to rest'")
             continue
         if incomplete(rest):                          # "Hinata, open..." <pause> "...Chrome"
             more = fast_stt.record(q, timeout=4, vad=vad, end_ms=config.END_SILENCE_MS, max_ms=10000, stop=busy)
             more_text = fast_stt.transcribe(more, prompt="Notepad. Chrome. VS Code. Hello.") if more else ""
-            if more_text:
+            # only a short follow-up belongs to the command ("...Chrome"); a long sentence was someone talking
+            if more_text and len(more_text.split()) <= 6:
                 print(f"[wake] ...and {more_text!r}")
                 rest = f"{rest.rstrip(' .,')} {more_text.strip()}"
         if time.time() - _state["fired"] < 1.0:
             continue
         _state["fired"] = time.time()
-        print(f"[wake] heard {text!r}")
+        print(f"[wake] heard {text!r}  ({len(pcm) / (fast_stt.RATE * 2):.1f}s audio, transcribed in {took:.0f} ms)")
         try:
             fire(rest)
         except Exception as e:

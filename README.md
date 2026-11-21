@@ -142,7 +142,8 @@ Hinata stays out of your way. No full-screen hologram, no "Done" after every act
 | "Hinata, go to Slack" | Brings Slack to the front (opens it if it isn't running) |
 | "Hinata, select all" · "copy" · "paste" · "undo" · "delete that" | The shortcut, instantly |
 | "Hinata, type see you full stop" | Spoken punctuation: full stop, comma, question mark |
-| **"Hinata, listen mode"** | No name needed for the next commands; normal talk is ignored. "Stop listening" ends it |
+| **"Hey Hinata"** (on its own) | She stays awake and takes every command and question, no name needed, until you say **"okay, now get back to rest"** |
+| **"Hinata, listen mode"** | Commands only, no name needed, for two quiet minutes; normal talk is ignored. "Stop listening" ends it |
 | **"Hinata, show hologram"** | Brings the full-screen 3D hologram back. "Hologram off" hides it |
 
 Problems and questions are still spoken out loud; finished work is just a soft tick.
@@ -342,6 +343,7 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 | `END_SILENCE_MS` | `450` | Silence after your last word before she acts |
 | `HOLOGRAM_ON_WAKE` | `False` | `True` opens the full-screen hologram every time (or say "show hologram") |
 | `SILENT_ACTIONS` | `True` | `False` makes her say "Opening Chrome" etc. again |
+| `AWAKE_IDLE_MINUTES` | `0` | After "Hey Hinata": `0` = awake until "get back to rest"; or minutes of quiet before she rests |
 | `FAST_MODEL` | `qwen2.5:3b` | Small, fast brain, downloaded once automatically (leaves GPU room for vision) |
 | `NEURAL_VOICE` | `en-IN-NeerjaNeural` | Try `en-US-AriaNeural` or `hi-IN-SwaraNeural` |
 | `STT_ENGINE` | `"fast"` | Always-on mic + Whisper on the GPU; `"google"` for the old online path |

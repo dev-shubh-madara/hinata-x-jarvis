@@ -120,6 +120,33 @@ quick.listen_mode(True)
 quick._listen["until"] = time.time() - 1
 check("listen mode times out by itself", run("type hello"), None)
 
+# ---- "Hey Hinata" alone: awake until "get back to rest"
+quick.listen_mode(False)
+config.AWAKE_IDLE_MINUTES = 0
+check("'Hey Hinata' alone = just her name", wake.decide("Hey Hinata."), "")
+quick.listen_mode(True, awake=True)                     # what the wake loop does for that
+check("awake", quick.is_awake(), True)
+for said, want in [("open notepad", "open notepad"), ("type hello there", "type hello there"),
+                   ("What's the weather in Warangal?", "What's the weather in Warangal?"),
+                   ("Tell me a joke", "Tell me a joke"), ("run this code", "run this code"),
+                   ("make a presentation on black holes", "make a presentation on black holes"),
+                   ("yeah I'll be there in five minutes", None), ("lol that was so funny", None),
+                   ("Hinata, select all", "select all")]:
+    check(f"awake hears {said[:30]!r}", wake.decide(said), want)
+quick._listen["until"] = time.time() + 1                 # an hour later... still awake (no timeout by default)
+quick.keep_alive()
+check("stays awake (no timeout unless set)", quick._listen["until"] - time.time() > 86400, True)
+for bye in ["Okay, now get back to rest.", "go to sleep", "you can rest now", "that's all"]:
+    quick.listen_mode(True, awake=True)
+    rest = wake.decide(bye)
+    check(f"'{bye}' -> rest", (rest, commands.handle(rest).startswith("Okay, resting"), quick.in_listen_mode()),
+          ("stop listening", True, False))
+check("after rest, chatter ignored again", wake.decide("open notepad"), None)
+config.AWAKE_IDLE_MINUTES = 5
+quick.listen_mode(True, awake=True)
+check("optional idle limit", 290 < quick._listen["until"] - time.time() <= 300, True)
+quick.listen_mode(False)
+
 # ---- quiet replies
 for reply, want in [("Opening Chrome.", False), ("Typed it.", False), ("Done.", False), ("Slack.", False),
                     ("I couldn't find anything like zebra.", True), ("Which file should I fix?", True),

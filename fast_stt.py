@@ -255,13 +255,14 @@ def load_whisper():
         silence = np.zeros(RATE, dtype=np.float32)
         # the GPU can look fine at load and still fail on the first real call (missing CUDA DLLs),
         # so a test transcription decides - it also warms the kernels up before your first command
-        for device, compute in (("cuda", "float16"), ("cpu", "int8")):
+        # int8_float16 needs about half the GPU memory of float16, leaving room for the AI model
+        for device, compute in (("cuda", "int8_float16"), ("cuda", "float16"), ("cpu", "int8")):
             try:
                 model = WhisperModel(name, device=device, compute_type=compute)
                 t0 = time.perf_counter()
                 list(model.transcribe(silence, beam_size=1)[0])
                 _whisper["model"] = model
-                print(f"[stt] faster-whisper '{name}' ready on {device.upper()} "
+                print(f"[stt] faster-whisper '{name}' ready on {device.upper()} ({compute}) "
                       f"(test run {(time.perf_counter() - t0) * 1000:.0f} ms)")
                 return model
             except Exception as e:

@@ -510,7 +510,19 @@ def run_powershell(command: str, purpose: str = ""):
     return execute_powershell(command)
 
 
+def _python_cmd(command: str) -> str:
+    """On many Windows PCs 'python' is only the Microsoft Store stub and 'py' is the real one."""
+    import shutil
+    real = shutil.which("python")
+    if real and "windowsapps" not in real.lower():
+        return command
+    if not shutil.which("py"):
+        return command
+    return re.sub(r"(?<![\w.\\/-])python(?:3)?(?=\s)", "py -3", command)
+
+
 def execute_powershell(command: str) -> str:
+    command = _python_cmd(command)
     print(f"[powershell] {command}")
     try:
         r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", command],

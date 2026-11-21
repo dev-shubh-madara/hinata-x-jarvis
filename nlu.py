@@ -211,10 +211,28 @@ def warm_up():
                 _post("/api/generate", {"model": _state["model"], "prompt": "", "keep_alive": KEEP_ALIVE},
                       timeout=(5, 120))
                 print(f"[nlu] {_state['model']} loaded and kept warm.")
+                print(f"[nlu] {gpu_report()}")
             except Exception as e:
                 print(f"[nlu] warm-up failed: {e}")
     threading.Thread(target=run, daemon=True, name="ollama-warmup").start()
     threading.Thread(target=_pull_fast_model, daemon=True, name="fast-model").start()
+
+
+def gpu_report() -> str:
+    """How much of each loaded model sits in GPU memory. Under 100% means Ollama moved part
+    of it to the CPU because the GPU is full - that is what makes answers slow."""
+    try:
+        models = _session.get(base_url() + "/api/ps", timeout=3).json().get("models", [])
+    except Exception as e:
+        return f"GPU report unavailable: {e}"
+    if not models:
+        return "no model loaded"
+    parts = []
+    for m in models:
+        size, vram = m.get("size") or 0, m.get("size_vram") or 0
+        pct = round(100 * vram / size) if size else 0
+        parts.append(f"{m.get('name')}: {pct}% on GPU ({vram / 1e9:.1f} of {size / 1e9:.1f} GB)")
+    return "GPU check - " + "; ".join(parts)
 
 
 def status_reason() -> str:
