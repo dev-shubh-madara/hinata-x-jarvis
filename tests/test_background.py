@@ -99,6 +99,11 @@ log.clear()
 commands.handle("Type-H, I'm not touching it")
 check("'Type-H,' still types (instant path)", log, [("type", "H, I'm not touching it")])
 
+# ---- a pause after the command word: she waits for the rest instead of acting on "open"
+for rest, want in [("open", True), ("Open.", True), ("go to", True), ("type", True), ("open chrome", False),
+                   ("type hello", False), ("enter", False), ("select all", False)]:
+    check(f"incomplete: {rest!r}", wake.incomplete(rest), want)
+
 # ---- listen mode: no name needed, chatter ignored
 check("without her name, nothing happens", run("type hello"), None)
 check("listen mode on", commands.handle("listen mode").startswith("Listen mode on"), True)

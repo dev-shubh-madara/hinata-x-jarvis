@@ -95,6 +95,15 @@ def fuzzy_match(text: str):
     return None
 
 
+_BARE = re.compile(r"^(?:open|launch|start|close|type|write|dictate|go to|switch to|play|search|search for|google|"
+                   r"find|send|message|call|remind me|set|turn on|turn off|show|hinata)$", re.I)
+
+
+def incomplete(rest: str) -> bool:
+    """Only a command word so far - you paused before saying what (e.g. 'open' ... 'chrome')."""
+    return bool(_BARE.match((rest or "").strip(" .,!?")))
+
+
 def decide(text: str):
     """What to run for this sentence: the command after her name, or - in listen mode -
     the whole sentence if it starts like a command. None = not for her."""
@@ -151,6 +160,12 @@ def _loop(m, fire, is_speaking):
         rest = decide(text or "")
         if rest is None:
             continue
+        if incomplete(rest):                          # "Hinata, open..." <pause> "...Chrome"
+            more = fast_stt.record(q, timeout=4, vad=vad, end_ms=config.END_SILENCE_MS, max_ms=10000, stop=busy)
+            more_text = fast_stt.transcribe(more, prompt="Notepad. Chrome. VS Code. Hello.") if more else ""
+            if more_text:
+                print(f"[wake] ...and {more_text!r}")
+                rest = f"{rest.rstrip(' .,')} {more_text.strip()}"
         if time.time() - _state["fired"] < 1.0:
             continue
         _state["fired"] = time.time()

@@ -50,3 +50,5 @@
 - Listen mode: commands without the wake word until "stop listening" or two quiet minutes; chatter that doesn't start like a command is ignored.
 - Wake word survives common mishearings after a pause ("and not to type...") when a real command word follows.
 - "Hinata, open Chrome" in one breath no longer plays the listening chime.
+- Setup: `setup_hinata_v2.bat` (one click) and `restart_hinata.bat`.
+- If you pause right after the command word ("Hinata, open..."), she waits for the rest instead of acting on "open".
