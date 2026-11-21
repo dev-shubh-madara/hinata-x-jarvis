@@ -218,28 +218,57 @@ def record(frames: "queue.Queue", timeout: float, vad=None, end_ms=None, max_ms=
 _whisper = {"model": None, "failed": False, "lock": threading.Lock()}
 
 
+def _cuda_dlls():
+    """pip's nvidia-cublas / nvidia-cudnn wheels put their DLLs in site-packages/nvidia/*/bin -
+    Windows only finds them if we say where."""
+    import os
+    import sys
+    if sys.platform != "win32":
+        return
+    for base in sys.path:
+        root = os.path.join(base, "nvidia")
+        if not os.path.isdir(root):
+            continue
+        for lib in os.listdir(root):
+            b = os.path.join(root, lib, "bin")
+            if os.path.isdir(b):
+                try:
+                    os.add_dll_directory(b)
+                except OSError:
+                    pass
+                os.environ["PATH"] = b + os.pathsep + os.environ.get("PATH", "")
+
+
 def load_whisper():
     with _whisper["lock"]:
         if _whisper["model"] is not None or _whisper["failed"]:
             return _whisper["model"]
         try:
-            from faster_whisper import WhisperModel
-            name = config.WHISPER_MODEL
-            try:
-                model = WhisperModel(name, device="cuda", compute_type="float16")
-                where = "GPU"
-            except Exception:
-                model = WhisperModel(name, device="cpu", compute_type="int8")
-                where = "CPU"
-            _whisper["model"] = model
-            print(f"[stt] faster-whisper '{name}' ready on {where}")
-            # first call is slow (CUDA kernels) - do it now, not on your first command
             import numpy as np
-            list(model.transcribe(np.zeros(RATE, dtype=np.float32), beam_size=1)[0])
+            from faster_whisper import WhisperModel
         except Exception as e:
             _whisper["failed"] = True
-            print(f"[stt] faster-whisper unavailable ({e}) - using Google speech")
-        return _whisper["model"]
+            print(f"[stt] faster-whisper not installed ({e}) - using Google speech")
+            return None
+        _cuda_dlls()
+        name = config.WHISPER_MODEL
+        silence = np.zeros(RATE, dtype=np.float32)
+        # the GPU can look fine at load and still fail on the first real call (missing CUDA DLLs),
+        # so a test transcription decides - it also warms the kernels up before your first command
+        for device, compute in (("cuda", "float16"), ("cpu", "int8")):
+            try:
+                model = WhisperModel(name, device=device, compute_type=compute)
+                t0 = time.perf_counter()
+                list(model.transcribe(silence, beam_size=1)[0])
+                _whisper["model"] = model
+                print(f"[stt] faster-whisper '{name}' ready on {device.upper()} "
+                      f"(test run {(time.perf_counter() - t0) * 1000:.0f} ms)")
+                return model
+            except Exception as e:
+                print(f"[stt] whisper on {device} failed: {e}")
+        _whisper["failed"] = True
+        print("[stt] faster-whisper unavailable - using Google speech")
+        return None
 
 
 _PROMPT = "Hinata, open Chrome. Play a song on YouTube. Send a WhatsApp message to Vishal."
