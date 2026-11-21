@@ -312,6 +312,15 @@ def clean(text: str) -> str:
     return t
 
 
+def _is_owner(pcm) -> bool:
+    try:
+        import voice_id
+        return voice_id.is_owner(pcm)
+    except Exception as e:
+        print(f"[stt] voice check unavailable: {e}")
+        return True
+
+
 def listen(timeout: float, stop=lambda: False, skip_ms: int = 220) -> str | None:
     """One spoken command from the always-on mic. Returns text or None."""
     m = mic()
@@ -320,10 +329,17 @@ def listen(timeout: float, stop=lambda: False, skip_ms: int = 220) -> str | None
     q = m.subscribe()
     try:
         t0 = time.perf_counter()
-        pcm = record(q, timeout, stop=stop, skip_ms=skip_ms)
-        if pcm is None:
-            print("[mic] Heard nothing.")
-            return None
+        end = time.time() + timeout
+        while True:
+            pcm = record(q, max(0.5, end - time.time()), stop=stop, skip_ms=skip_ms)
+            skip_ms = 0
+            if pcm is None:
+                print("[mic] Heard nothing.")
+                return None
+            if _is_owner(pcm):
+                break                                # your voice - transcribe it
+            if time.time() >= end:                   # someone else talked; keep waiting for you
+                return None
         t1 = time.perf_counter()
         text = transcribe(pcm)
         print(f"[stt] {len(pcm) / (RATE * 2):.1f}s audio, endpoint {(t1 - t0):.2f}s, "

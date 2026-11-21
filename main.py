@@ -220,6 +220,10 @@ def _warm_up():
         import kokoro_tts
         import file_index
         kokoro_tts.warm_up()
+        import voice_id
+        voice_id.warm_up()
+        if not voice_id.enrolled():
+            print("[voice] voice lock not set up yet - say 'Hinata, learn my voice'")
         file_index.start_background()            # all-drives index, quietly, at low priority
     except Exception as e:
         print(f"[warmup] {e}")

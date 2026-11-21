@@ -124,6 +124,15 @@ def decide(text: str):
     return None
 
 
+def _owner(pcm) -> bool:
+    try:
+        import voice_id
+        return voice_id.is_owner(pcm)
+    except Exception as e:
+        print(f"[wake] voice check unavailable: {e}")
+        return True
+
+
 def _awake_sound():
     try:
         import tts_engine
@@ -168,6 +177,8 @@ def _loop(m, fire, is_speaking):
             continue
         if len(pcm) < fast_stt.RATE * 2 * 0.25:                         # under 0.25 s: a click, not a word
             continue
+        if not _owner(pcm):                                              # voice lock: not your voice
+            continue
         t0 = time.perf_counter()
         text = fast_stt.transcribe(pcm, prompt="Hinata, open Notepad. Hinata, type hello. Hinata, enter. Hinata, new line. Hinata, go to Slack.")
         took = (time.perf_counter() - t0) * 1000
@@ -182,7 +193,8 @@ def _loop(m, fire, is_speaking):
             continue
         if incomplete(rest):                          # "Hinata, open..." <pause> "...Chrome"
             more = fast_stt.record(q, timeout=4, vad=vad, end_ms=config.END_SILENCE_MS, max_ms=10000, stop=busy)
-            more_text = fast_stt.transcribe(more, prompt="Notepad. Chrome. VS Code. Hello.") if more else ""
+            more_text = fast_stt.transcribe(more, prompt="Notepad. Chrome. VS Code. Hello.") \
+                if more and _owner(more) else ""
             # only a short follow-up belongs to the command ("...Chrome"); a long sentence was someone talking
             if more_text and len(more_text.split()) <= 6:
                 print(f"[wake] ...and {more_text!r}")

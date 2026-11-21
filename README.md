@@ -144,6 +144,7 @@ Hinata stays out of your way. No full-screen hologram, no "Done" after every act
 | "Hinata, type see you full stop" | Spoken punctuation: full stop, comma, question mark |
 | **"Hey Hinata"** (on its own) | She stays awake and takes every command and question, no name needed, until you say **"okay, now get back to rest"** |
 | **"Hinata, listen mode"** | Commands only, no name needed, for two quiet minutes; normal talk is ignored. "Stop listening" ends it |
+| **"Hinata, learn my voice"** | Talk for ~15 seconds once. From then on she only obeys **your** voice; other people, the TV and videos are ignored. "Voice lock off" / "voice lock on" / "forget my voice" |
 | **"Hinata, show hologram"** | Brings the full-screen 3D hologram back. "Hologram off" hides it |
 
 Problems and questions are still spoken out loud; finished work is just a soft tick.
@@ -343,6 +344,7 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 | `END_SILENCE_MS` | `450` | Silence after your last word before she acts |
 | `HOLOGRAM_ON_WAKE` | `False` | `True` opens the full-screen hologram every time (or say "show hologram") |
 | `SILENT_ACTIONS` | `True` | `False` makes her say "Opening Chrome" etc. again |
+| `VOICE_LOCK` / `VOICE_THRESHOLD` | `True` / `0.47` | Only your voice (after "learn my voice"). Lower the number if she ever ignores you, raise it if she obeys someone else |
 | `AWAKE_IDLE_MINUTES` | `0` | After "Hey Hinata": `0` = awake until "get back to rest"; or minutes of quiet before she rests |
 | `FAST_MODEL` | `qwen2.5:3b` | Small, fast brain, downloaded once automatically (leaves GPU room for vision) |
 | `NEURAL_VOICE` | `en-IN-NeerjaNeural` | Try `en-US-AriaNeural` or `hi-IN-SwaraNeural` |
@@ -362,6 +364,7 @@ Everything lives in **[`config.py`](config.py)**. The settings you're most likel
 ## 🛡️ Safety (built in)
 
 - 🎧 **Wake word:** the microphone stays open so she can hear "Hinata". The audio never leaves your laptop. Short phrases are transcribed on your GPU and thrown away unless they start with her name. Set `WAKE_WORD = False` (and `STT_ENGINE = "google"`) to go back to hotkey-only listening.
+- 🔐 **Voice lock:** after "learn my voice" she checks every sentence against your voice print before even transcribing it. The print is a list of numbers in `%LOCALAPPDATA%\HinataXHelper\voice`; no recording is kept. If the check itself ever fails, she lets the sentence through rather than locking you out.
 - 🌐 **Browser:** she never types into password, card, CVV or OTP boxes, and asks before clicking Pay, Buy, Send, Delete or Post.
 - 🧑‍💻 **Code:** snippets that touch files outside `Hinata_Output\Code`, run programs or use the network ask first. Fixes are shown as a diff and saved only on "confirm", with a `.bak` copy.
 - 🧩 **Plug-ins:** MCP tools that write, send or delete ask first unless you mark the server `"trusted": true`.
@@ -390,6 +393,7 @@ hinata-x-jarvis/
 ├── mcp_client.py      # MCP plug-ins
 ├── powers.py          # loads the modules above as AI tools
 ├── quick.py           # instant keys/typing, "go to <app>", listen mode
+├── voice_id.py        # voice lock: only your voice (speaker verification)
 ├── session.py         # conversation mode (chat vs work)
 ├── commands.py        # the router: confirms, fast paths, phone, AI fallback
 ├── nlu.py             # local Ollama agent - tool routing, streaming, multi-step

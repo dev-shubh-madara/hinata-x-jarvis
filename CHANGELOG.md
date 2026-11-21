@@ -58,3 +58,8 @@
   model is on the GPU; wake-word lines show how long transcription took.
 - PowerShell commands use `py -3` when `python` is only the Microsoft Store stub.
 - A long sentence after a bare "open" is no longer joined to it.
+- Voice lock: "learn my voice" (about 15 s of talking) and she only obeys you. Speaker check with the 3D-Speaker
+  ERes2Net model through sherpa-onnx, offline, before transcription. Learning splits the recording into 1.5 s
+  pieces and drops the ones that don't match the rest, so a friend talking during it isn't learned as you.
+  In testing with synthetic voices: 30/30 own commands accepted, 0/90 from 9 other voices, 0/10 from a voice
+  that talked during learning. Every decision is logged with its score for tuning `VOICE_THRESHOLD`.

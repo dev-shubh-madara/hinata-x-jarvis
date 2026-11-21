@@ -41,6 +41,8 @@
 | `mcp_client.py` | MCP servers over stdio as extra tools |
 | `kokoro_tts.py` | Offline voice |
 | `powers.py` | Registers the modules above with the agent |
+| `voice_id.py` | Voice lock: speaker embedding check before transcription |
+| `quick.py` | Instant keys and typing, window focus, listen/awake modes |
 | `session.py` | One open-to-close conversation (chat mode vs work mode) |
 | `commands.py` | Router: confirmations, fast patterns, phone routing, AI fallback |
 | `nlu.py` | Local AI agent on Ollama: about 40 tools, multi-step, JSON fallback |

@@ -115,6 +115,20 @@ def already_spoken() -> bool:
     return _spoken
 
 
+def _say_and_wait(msg: str):
+    """Speak, and don't return until she's finished (so the mic doesn't record her own voice)."""
+    if _speak:
+        _speak(msg)
+        import time as _t
+        _t.sleep(0.2)
+        try:
+            import tts_engine
+            tts_engine.wait_idle(30)
+        except Exception:
+            pass
+        _t.sleep(0.3)
+
+
 def set_speaker(fn):
     global _speak
     _speak = fn
@@ -611,6 +625,26 @@ def handle(text: str) -> str:
     r = _resolve_pending(t)
     if r is not None:
         return r
+
+    # ---- voice lock
+    if re.fullmatch(r"(?:learn|train|register|record|save|remember|recogni[sz]e) (?:my|me|this) voice(?: again)?|"
+                    r"(?:set ?up|start) (?:the )?voice (?:lock|id|recognition)", t):
+        import voice_id
+        return _info(voice_id.learn(speak=_say_and_wait))
+    if re.fullmatch(r"(?:turn |switch )?(?:off|disable)(?: the)? voice (?:lock|id|recognition)|voice (?:lock|id) off|"
+                    r"listen to (?:everyone|anybody|everybody)", t):
+        config.VOICE_LOCK = False
+        return _info("Voice lock off. I'll listen to everyone.")
+    if re.fullmatch(r"(?:turn |switch )?(?:on|enable)(?: the)? voice (?:lock|id|recognition)|voice (?:lock|id) on|"
+                    r"only listen to (?:me|my voice)", t):
+        import voice_id
+        config.VOICE_LOCK = True
+        if not voice_id.enrolled():
+            return _info("I don't know your voice yet. Say 'learn my voice' first.")
+        return _info("Voice lock on. I only listen to you.")
+    if re.fullmatch(r"(?:forget|delete|remove|reset) my voice(?: print)?", t):
+        import voice_id
+        return _info(voice_id.forget())
 
     # ---- background mode: listen mode + hologram on/off
     if re.fullmatch(r"(?:start |turn on |enable |go into |enter )?(?:listen(?:ing)?|dictation|hands[- ]free|command) mode(?: on)?|"

@@ -48,6 +48,12 @@ WAKE_WORDS = ["hinata", "jarvis"]   # any of these at the start of a sentence wa
 # say "okay, now get back to rest". 0 = stay awake until told; or minutes of silence before she rests.
 AWAKE_IDLE_MINUTES = 0
 
+# ---- Voice lock ------------------------------------------------------------------
+# After "Hinata, learn my voice" she only obeys your voice; other people, the TV and
+# videos are ignored. Each decision is logged as "[voice] ... (score 0.xx)".
+VOICE_LOCK = True
+VOICE_THRESHOLD = 0.47         # lower = accepts more (if she sometimes ignores YOU), higher = stricter
+
 # ---- Conversation mode ---------------------------------------------------------
 # While you're just talking (questions, chat - anything that needs no work on the
 # PC) the hologram stays open and keeps listening, so you don't press the hotkey
