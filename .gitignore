@@ -10,3 +10,5 @@ Hinata_Output/
 .idea/
 .DS_Store
 Thumbs.db
+preview_log.txt
+bar_probe*

@@ -86,6 +86,7 @@ class CaptionBar:
         self.hide_at = None
         self.t0 = time.time()
         self.w, self.h = 560, 64
+        self._click_through = False
 
     # ---- public (call from the Tk thread) ----------------------------------------
 
@@ -99,7 +100,6 @@ class CaptionBar:
         if not self.visible:
             self.visible = True
             self.top.deiconify()
-            self._make_click_through()
             self._tick()
         self._layout()
 
@@ -208,6 +208,11 @@ class CaptionBar:
             self.top.attributes("-alpha", max(0.0, min(1.0, self.alpha)))
         except tk.TclError:
             pass
+        if not self._click_through and self.alpha >= 0.5:
+            # applied once the bar is on screen: set while it was still fully transparent,
+            # Windows kept it invisible (seen on a real laptop)
+            self._make_click_through()
+            self._click_through = True
         if self.alpha <= 0.01 and self.target_alpha == 0.0:
             self.visible = False
             self.hide_at = None
