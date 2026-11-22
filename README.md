@@ -142,6 +142,7 @@ Hinata stays out of your way. No full-screen hologram, no "Done" after every act
 | "Hinata, go to Slack" | Brings Slack to the front (opens it if it isn't running) |
 | "Hinata, select all" · "copy" · "paste" · "undo" · "delete that" | The shortcut, instantly |
 | "Hinata, type see you full stop" | Spoken punctuation: full stop, comma, question mark |
+| **"Hinata, operate my mobile"** | Everything goes to your phone until **"operate my laptop"** (or "get back to rest"). Otherwise every command runs on the laptop. "on my phone, ..." works for a single command |
 | **"Hey Hinata"** (on its own) | She stays awake and takes every command and question, no name needed, until you say **"okay, now get back to rest"** |
 | **"Okay, now get back to rest"** | She goes back to resting at once, from any mode. While resting, nothing around you is acted on; only a sentence that starts with "Hinata" wakes her, for that one command |
 | **"Hinata, listen mode"** | Commands only, no name needed, for two quiet minutes; normal talk is ignored. "Stop listening" ends it |
@@ -149,6 +150,8 @@ Hinata stays out of your way. No full-screen hologram, no "Done" after every act
 | **"Hinata, show hologram"** | Brings the full-screen 3D hologram back. "Hologram off" hides it |
 
 Problems and questions are still spoken out loud; finished work is just a soft tick.
+
+While she listens and works, a small glowing caption bar sits centred about 2 cm above the bottom of the screen, showing what you said and what she's doing (LISTENING, WORKING, DONE). It fades out when she's finished, never takes keyboard focus and lets clicks through. In awake mode a slim AWAKE strip stays until you send her to rest. `CAPTION_BAR = False` turns it off; `preview_caption_bar.bat` shows it once.
 
 ### 🧬 New in 2.0: faster and stronger
 
@@ -393,7 +396,8 @@ hinata-x-jarvis/
 ├── coder.py           # run Python, fix files, VS Code
 ├── mcp_client.py      # MCP plug-ins
 ├── powers.py          # loads the modules above as AI tools
-├── quick.py           # instant keys/typing, "go to <app>", listen mode
+├── quick.py           # instant keys/typing, "go to <app>", listen/awake/phone modes
+├── caption_bar.py     # the glowing caption strip at the bottom of the screen
 ├── voice_id.py        # voice lock: only your voice (speaker verification)
 ├── session.py         # conversation mode (chat vs work)
 ├── commands.py        # the router: confirms, fast paths, phone, AI fallback

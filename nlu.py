@@ -401,8 +401,8 @@ TOOL_GROUPS = [
      r"convert|how many|prime|factorial|sum|power of|to the power|square root|percent(?:age)?)\b",
      ["run_python", "fix_code", "open_in_vscode", "read_screen_text"]),
     (r"\b(screen|this|that|here|read|showing|see)\b", ["look_at_screen", "read_screen_text"]),
-    (r"\b(whats ?app|message|text|email|e-?mail|mail|send|call|tell)\b",
-     ["whatsapp_message", "draft_email", "call_and_talk"]),
+    (r"\b(whats ?app|message|text|email|e-?mail|mail|send|tell)\b",
+     ["whatsapp_message", "draft_email"]),
     (r"\b(task|tasks|to ?do|note|notes|remind|reminder|timer|alarm|minutes|plan)\b",
      ["team_task", "team_note", "set_timer"]),
     (r"\b(ppt|presentation|slides|reel|motion|animat\w*|explainer|ad|edit|trim|cut|caption)\b",
@@ -410,7 +410,7 @@ TOOL_GROUPS = [
     (r"\b(reverse|clone|tech stack|rebuild|inspect)\b", ["website_reverse_engineer"]),
     (r"\b(news|cricket|score|iss|space station)\b", ["live_info"]),
     (r"\b(remember|forget|know about|told you)\b", ["remember_fact", "recall_memory"]),
-    (r"\b(order|food|swiggy|zomato|biryani|pizza)\b", ["order_food"]),
+    # ordering food and phone calls happen on the phone: only offered in phone requests (PHONE_TOOLS)
 ]
 PHONE_TOOLS = ["pair_phone", "phone_open_app", "phone_tap", "phone_type", "phone_swipe", "phone_key", "phone_call",
                "phone_message", "phone_open_url", "phone_read_screen", "phone_screenshot", "phone_toggle",
@@ -423,12 +423,12 @@ def select_tools(text: str, phone_hint: bool = False) -> list:
     """The tools that fit this request: a core set, matching groups, phone tools, matching plug-ins."""
     t = (text or "").lower()
     names: list[str] = []
-    if phone_hint or re.search(r"\b(phone|mobile|android)\b", t):
+    if phone_hint:                                  # only when you asked for the phone ("operate my mobile" / "on my phone")
         names += PHONE_TOOLS
     for pattern, group in TOOL_GROUPS:
         if re.search(pattern, t):
             names += group
-    if re.search(r"\b(pair|qr)\b", t):
+    if re.search(r"\b(pair|qr|connect)\b.*\b(phone|mobile)\b|\b(phone|mobile)\b.*\b(pair|connect)\b", t):
         names.append("pair_phone")
     names += CORE_TOOLS
     names += _last_sel                              # follow-ups ("now pause it") keep last turn's tools

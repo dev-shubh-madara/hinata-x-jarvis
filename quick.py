@@ -235,11 +235,58 @@ def _bring_front(hwnd):
 _listen = {"until": 0.0, "awake": False}
 
 
+_watchers: list = []
+
+
+def on_awake_change(fn):
+    """fn(awake: bool) is called when awake mode starts or ends (the caption bar uses it)."""
+    _watchers.append(fn)
+
+
 def listen_mode(on: bool, awake: bool = False):
     """on: take commands without her name. awake=True is "Hey Hinata" mode: questions too,
     and it lasts until "get back to rest" (or AWAKE_IDLE_MINUTES of quiet, if set)."""
+    was = is_awake()
     _listen["awake"] = bool(on and awake)
     _listen["until"] = time.time() + _idle() if on else 0.0
+    if not on:
+        phone_mode(False)                          # resting always brings her back to the laptop
+    if is_awake() != was:
+        for fn in list(_watchers):
+            try:
+                fn(is_awake())
+            except Exception:
+                pass
+
+
+# ---------------------------------------------------------------- which device
+
+_device = {"phone": False}
+
+
+def phone_mode(on: bool):
+    """'operate my mobile' -> commands go to the phone until 'operate my laptop' or rest."""
+    _device["phone"] = bool(on)
+
+
+def on_phone() -> bool:
+    return _device["phone"]
+
+
+PHONE_ON = re.compile(r"^(?:now |please |ok(?:ay)? )*(?:operate|control|use|switch to|go to|work on|handle) (?:my |the )?"
+                      r"(?:mobile|phone|android)(?: phone)?(?: mode)?(?:[,.]? *(?:and |then |now )?(?P<rest>.+))?$|"
+                      r"^(?:phone|mobile) mode(?: on)?$", re.I)
+LAPTOP_ON = re.compile(r"^(?:now |please |ok(?:ay)? )*(?:operate|control|use|switch to|go to|go back to|back to|work on) "
+                       r"(?:my |the )?(?:laptop|pc|computer|desktop)(?: mode)?(?:[,.]? *(?:and |then |now )?(?P<rest>.+))?$|"
+                       r"^(?:laptop|pc|computer) mode(?: on)?$|^(?:phone|mobile) mode off$", re.I)
+ON_LAPTOP = re.compile(r"\s*\b(?:in|on|from|using) (?:my |the )?(?:laptop|pc|computer|desktop)\b[,]?", re.I)
+
+
+def explicit_laptop(text: str):
+    """'open whatsapp in my laptop' -> 'open whatsapp' (and True). Otherwise (text, False)."""
+    if ON_LAPTOP.search(text or ""):
+        return re.sub(r"\s+", " ", ON_LAPTOP.sub(" ", text)).strip(" ,."), True
+    return text, False
 
 
 def _idle() -> float:

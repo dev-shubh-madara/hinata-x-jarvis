@@ -122,6 +122,7 @@ CONFIRM_SECONDS = 25
 # action - the keys just go to the window you're in. Say "show hologram" to bring the
 # full-screen 3D one back (and "hologram off" to hide it again).
 HOLOGRAM_ON_WAKE = False
+CAPTION_BAR = True             # small glowing strip at the bottom: what you said + what she's doing
 SILENT_ACTIONS = True          # don't say "Opening Chrome" etc. - a soft tick instead (errors are still spoken)
 LISTEN_MODE_IDLE_MINUTES = 2   # "listen mode" (no wake word needed) ends after this much quiet
 

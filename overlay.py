@@ -325,6 +325,33 @@ class MicOverlay:
 
     def set_state(self, state: str):
         self.root.after(0, self._apply_state, state)
+        self.root.after(0, lambda: self._bar_state(state))
+
+    # ---- caption bar (background mode) -------------------------------------------
+
+    def _bar(self):
+        if getattr(self, "_caption_bar", None) is None:
+            import caption_bar
+            self._caption_bar = caption_bar.CaptionBar(self.root, self._no_activate)
+        return self._caption_bar
+
+    def _bar_on(self) -> bool:
+        return bool(getattr(config, "CAPTION_BAR", True)) and not self._hud_mode
+
+    def _bar_state(self, state):
+        if self._bar_on() and state in ("listening", "thinking", "speaking", "rejected"):
+            self._bar().show(state)
+
+    def awake_changed(self, awake: bool):
+        """Awake mode on: a slim AWAKE strip stays up. Off: it fades away."""
+        def run():
+            if not self._bar_on():
+                return
+            if awake:
+                self._bar().show("awake", line="")
+            else:
+                self._bar().hide(0.3)
+        self.root.after(0, run)
 
     def set_info(self, key: str, value: str):
         self.root.after(0, self._info.__setitem__, key, value)
@@ -340,6 +367,11 @@ class MicOverlay:
             elif you is not None:          # a new command clears the old timing
                 self._caption["ms"] = None
             self._draw_captions()
+            if self._bar_on():
+                if reply:
+                    self._bar().set_line(reply)
+                elif you:
+                    self._bar().show("thinking", line=you)
         self.root.after(0, run)
 
     def expand(self):
@@ -354,6 +386,20 @@ class MicOverlay:
 
     def collapse(self):
         self.root.after(0, self._do_collapse)
+        self.root.after(0, self._bar_done)
+
+    def _bar_done(self):
+        bar = getattr(self, "_caption_bar", None)
+        if bar is None:
+            return
+        try:
+            import quick
+            if quick.is_awake():                     # awake: shrink back to the AWAKE strip
+                self.root.after(1500, lambda: quick.is_awake() and bar.show("awake", line=""))
+                return
+        except Exception:
+            pass
+        bar.hide(1.5)
 
     # ---- right-click: sleep, never quit by accident -------------------------------
 

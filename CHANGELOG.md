@@ -70,3 +70,9 @@
   for follow-ups (that picked up game audio and friends talking). The hotkey keeps the back-and-forth conversation.
 - The speech-to-text hint is just "Hey Hinata." - example commands in it made Whisper hear "Hinata, go." when only
   her name was said.
+- Laptop by default. Phone tools are offered to the AI only after "operate my mobile" or "on my phone ...", and a
+  phone tool called during a laptop request is refused. (From the log: "open WhatsApp and send message to Anik"
+  made the AI pick the phone-call tool and spend 12 s trying the phone.)
+- "Operate my mobile" / "operate my laptop" switch devices; resting always returns to the laptop.
+- "Open WhatsApp and send hi/message to <name>" runs instantly on the laptop without the AI.
+- Caption bar: a glowing strip centred 2 cm above the bottom of the screen with what you said and what she's doing.

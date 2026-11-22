@@ -50,6 +50,24 @@ _WA_SEND = re.compile(
     rf"(?:{_WA} )?(?:message|msg|text)?\s*(?:to )?(.+?) (?:on {_WA} )?(?:saying|that says|that|telling (?:him|her|them)(?: that)?|:)\s+(.+)$",
     re.I)
 _WA_SEND2 = re.compile(rf"^(?:please )?(?:message|text|msg|ping) (.+?) on {_WA}[:,]? (.+)$", re.I)
+_WA_SEND3 = re.compile(
+    rf"^(?:now |please |ok(?:ay)? |and |then )*(?:open {_WA}(?: and)?(?: then)? )?(?:send|say|text|message|ping|drop)\s+"
+    rf"(?:a |an )?(?P<msg>hi|hii|hello|hey|hai|good morning|good night|(?:{_WA} )?(?:message|msg|text))\s+"
+    rf"(?:to )?(?P<who>(?!.*\b(?:that|saying|telling|says)\b)[a-z][\w .'-]{{0,40}}?)(?: on {_WA})?$", re.I)
+_WA_GREETING_TAIL = re.compile(r"\s+(hi|hii|hai|hello|hey)$", re.I)
+
+
+def _wa_parts(who: str, msg: str):
+    """('Anik Hai', 'message') -> ('Anik', 'Hai'): a greeting said after the name is the message."""
+    who = (who or "").strip()
+    if re.fullmatch(rf"(?:{_WA} )?(?:message|msg|text)", msg or "", re.I):
+        g = _WA_GREETING_TAIL.search(who)
+        if g:
+            return who[:g.start()].strip(), g.group(1).capitalize()
+        return who, "Hi"
+    return who, (msg or "Hi").capitalize()
+
+
 _SAVE_CONTACT = re.compile(r"^save (?:contact |number |the number (?:of|for) )?(.+?)(?:'s)?(?: number| whatsapp| contact)?(?: is| as)? ([+\d][\d ()+-]{8,})$")
 _WEB_RE = re.compile(r"\b(reverse[- ]engineer|clone|tech stack of|how is .+ (?:built|made)|analy[sz]e|break down|inspect|copy|mirror|rebuild)\b"
                      r".*?(?:\b(?:website|site|web ?page|page)\b|\b[a-z0-9-]+(?:\.| dot )(?:com|in|io|org|net|dev|app|ai|co|xyz|me|tech)\b)")
@@ -306,12 +324,28 @@ def _should_stop() -> bool:
 
 # ---------------------------------------------------------------- tool executor (shared by AI + fast path)
 
+PHONE_ONLY_TOOLS = {"call_and_talk", "order_food"}
+
+
+def _phone_allowed() -> bool:
+    """Phone tools are blocked only while handling a request we know is for the laptop."""
+    import quick
+    return quick.on_phone() or _phone_request["on"] is not False
+
+
+_phone_request = {"on": None}        # None: not inside handle(); False: laptop request; True: phone asked for
+
+
 def execute(name: str, a: dict):
     global _acted
     a = a or {}
     g = lambda k, d="": a.get(k, d) if a.get(k) is not None else d   # noqa: E731
     if name == "pair_phone":
         _hide_hologram()
+    if (name.startswith("phone_") or name in PHONE_ONLY_TOOLS) and not _phone_allowed():
+        print(f"[commands] blocked {name}: on the laptop (say 'operate my mobile' for the phone)")
+        return ("That is a phone action, but the user is working on the LAPTOP. Do it on the laptop instead "
+                "(for WhatsApp use whatsapp_message). Only use the phone if the user says 'operate my mobile'.")
     res = _execute(name, a, g)
     if name not in INFO_TOOLS:
         _acted = True
@@ -612,19 +646,49 @@ def _phone_split(text: str):
 
 def handle(text: str) -> str:
     """Executes a command and returns the reply to speak."""
+    _phone_request["on"] = False
+    try:
+        return _handle(text)
+    finally:
+        _phone_request["on"] = None
+
+
+def _handle(text: str) -> str:
     global _created_pending, _acted, _info_reply, _spoken
     _created_pending = False
     _acted = False
     _info_reply = False
     _spoken = False
     raw = text.strip()
+    # "Hey Hinata, now operate my mobile" -> "now operate my mobile" (her name isn't part of the command)
+    raw = re.sub(r"^\s*(?:(?:hey|hi|ok|okay)[, ]+)?(?:hinata|jarvis)\b[,.!]?\s+", "", raw, flags=re.I) or raw
     t = re.sub(r"\s+", " ", raw.lower()).strip(" .!?")
-    if config.ASSISTANT_NAME and t.startswith(("hinata ", "hey hinata ")):
-        t = t.split(" ", 2 if t.startswith("hey") else 1)[-1]
 
     r = _resolve_pending(t)
     if r is not None:
         return r
+
+    # ---- which device: the laptop unless you said "operate my mobile"
+    import quick as _qd
+    if (m := _qd.PHONE_ON.match(raw.strip(" .!?"))):
+        _qd.phone_mode(True)
+        rest = (m.group("rest") or "").strip()
+        if not rest:
+            return _info("Okay, I'm on your phone now. Say 'operate my laptop' to come back.")
+        raw, t = rest, rest.lower().strip(" .!?")
+    elif (m := _qd.LAPTOP_ON.match(raw.strip(" .!?"))):
+        _qd.phone_mode(False)
+        rest = (m.group("rest") or "").strip()
+        if not rest:
+            return _info("Back on your laptop.")
+        raw, t = rest, rest.lower().strip(" .!?")
+    _raw_laptop, _laptop_said = _qd.explicit_laptop(raw)    # "...in my laptop": never the phone
+    if _laptop_said and not re.match(r"^\s*(?:in|on|from|using) (?:my |the )?(?:laptop|pc|computer|desktop)\b", raw, re.I):
+        raw = _raw_laptop                              # "open whatsapp in my laptop" -> "open whatsapp"
+        t = re.sub(r"\s+", " ", raw.lower()).strip(" .!?")   # (a leading "on my laptop, ..." keeps its own route)
+    if _qd.on_phone() and not _laptop_said and not _qd.is_rest(t) and _phone_split(raw) is None:
+        raw = "on my phone " + raw                     # phone mode: every command goes to the phone
+        t = "on my phone " + t
 
     # ---- voice lock
     if re.fullmatch(r"(?:learn|train|register|record|save|remember|recogni[sz]e) (?:my|me|this) voice(?: again)?|"
@@ -713,6 +777,15 @@ def handle(text: str) -> str:
         _hide_hologram()
         res = whatsapp.prepare(m.group(1), m.group(2), overlay=_overlay)
         return _ask(res) if isinstance(res, Confirm) else res
+    # ---- WhatsApp from the laptop: "open whatsapp and send hi to Anik" (no 'saying' needed)
+    if "on my phone" not in t and (m := _WA_SEND3.match(_raw_laptop.strip(" .!?"))):
+        import whatsapp
+        who, msg = _wa_parts(m.group("who"), m.group("msg"))
+        _acted = True
+        _hide_hologram()
+        res = whatsapp.prepare(who, msg, overlay=_overlay)
+        return _ask(res) if isinstance(res, Confirm) else res
+
     if (m := _SAVE_CONTACT.match(t)):
         import whatsapp
         return _info(whatsapp.save_contact(m.group(1), m.group(2)))
@@ -925,6 +998,7 @@ def handle(text: str) -> str:
     # ---- phone commands
     phone_cmd = _phone_split(raw)
     if phone_cmd is not None:
+        _phone_request["on"] = True                   # you asked for the phone in this sentence
         _acted = bool(phone_cmd)
         if not _MULTI.search(phone_cmd):
             res = phone.handle(phone_cmd)

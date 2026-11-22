@@ -147,6 +147,7 @@ def voice_loop(overlay: MicOverlay):
     hotkey_listener.install_hotkeys()
     if fast:
         import wake
+        quick.on_awake_change(overlay.awake_changed)     # slim AWAKE strip while "Hey Hinata" mode is on
         if wake.start(hotkey_listener.fire_wake, is_speaking=tts_engine.is_speaking):
             overlay.set_info("WAKE", "SAY HINATA")
     brain_ok = _brain_status(overlay)
