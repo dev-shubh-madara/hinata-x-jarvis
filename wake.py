@@ -104,6 +104,36 @@ def incomplete(rest: str) -> bool:
     return bool(_BARE.match((rest or "").strip(" .,!?")))
 
 
+def route(text: str, seconds: float = 2.0):
+    """What to do with one sentence from the mic. Returns (what, command):
+        ("ignore", None)   - not for her (resting and no name, or chatter)
+        ("awake", "")      - "Hey Hinata" on its own: awake until "get back to rest"
+        ("rest", "")       - "okay, now get back to rest": back to resting at once
+        ("run", command)   - do this command
+    Resting is the default: then ONLY a sentence that starts with her name does anything."""
+    import quick
+    rest = decide(text)
+    if rest is None:
+        return "ignore", None
+    if quick.is_rest(rest) or rest == "stop listening":
+        quick.listen_mode(False)
+        return "rest", ""
+    if rest.strip(" .,!?").lower() in ("go", "hey", "hi", "yo", "ok", "okay") and seconds < 1.5:
+        rest = ""                                     # a short "Hinata go/hey" is just her name
+    if rest == "" and getattr(config, "WAKE_STAYS_AWAKE", True):
+        quick.listen_mode(True, awake=True)
+        return "awake", ""
+    return "run", rest
+
+
+def _say(text: str):
+    try:
+        import tts_engine
+        tts_engine.speak(text, wait=False)
+    except Exception:
+        print(f"[Hinata] {text}")
+
+
 def decide(text: str):
     """What to run for this sentence: the command after her name, or - in listen mode -
     the whole sentence if it starts like a command. None = not for her."""
@@ -180,16 +210,20 @@ def _loop(m, fire, is_speaking):
         if not _owner(pcm):                                              # voice lock: not your voice
             continue
         t0 = time.perf_counter()
-        text = fast_stt.transcribe(pcm, prompt="Hinata, open Notepad. Hinata, type hello. Hinata, enter. Hinata, new line. Hinata, go to Slack.")
+        # only her name in the hint: example commands here made whisper add words you never
+        # said ("Hinata" alone came out as "Hinata, go.")
+        text = fast_stt.transcribe(pcm, prompt="Hey Hinata.")
         took = (time.perf_counter() - t0) * 1000
-        rest = decide(text or "")
-        if rest is None:
+        what, rest = route(text or "", len(pcm) / (fast_stt.RATE * 2))
+        if what == "ignore":
             continue
-        if rest == "" and getattr(config, "WAKE_STAYS_AWAKE", True):
-            import quick                              # "Hey Hinata" alone: stay awake until "get back to rest"
-            quick.listen_mode(True, awake=True)
+        if what == "awake":
             _awake_sound()
-            print("[wake] awake - taking every command until 'get back to rest'")
+            print(f"[wake] heard {text!r} - awake, taking every command until 'get back to rest'")
+            continue
+        if what == "rest":
+            print(f"[wake] heard {text!r} - resting; only her name wakes her now")
+            _say("Okay, resting. Say Hey Hinata when you need me.")
             continue
         if incomplete(rest):                          # "Hinata, open..." <pause> "...Chrome"
             more = fast_stt.record(q, timeout=4, vad=vad, end_ms=config.END_SILENCE_MS, max_ms=10000, stop=busy)

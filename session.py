@@ -13,6 +13,12 @@ back to the small orb.
   * "Okay Hinata, let's continue with our work" / "that's all" / "bye"
         -> she says goodbye and closes.
   * Silence for CONVO_IDLE_SECONDS -> she closes by herself.
+  * "Okay, now get back to rest" -> she goes back to resting at once, whatever
+    mode she was in (handled here, never sent to the AI).
+
+Woken by her name (not the hotkey), a session is one command: she does it and
+goes back to resting, so nothing around you is picked up afterwards. To keep
+her listening, say "Hey Hinata" on its own (awake mode, see quick.py).
 
 Kept free of any Windows / UI imports so it can be tested with fake input.
 """
@@ -22,9 +28,10 @@ import time
 
 def run_session(*, overlay, typed, listen, ask_command, run_command, speak,
                 chime=lambda: None, drain=lambda: None, is_end=lambda text: False,
+                is_rest=lambda text: False, on_rest=lambda: None,
                 conversation_mode=True, first_timeout=5, follow_timeout=8,
                 idle_seconds=30, clock=time.time) -> str:
-    """Returns why it ended: 'action', 'ended', 'idle' or 'nothing heard'."""
+    """Returns why it ended: 'action', 'ended', 'rest', 'idle' or 'nothing heard'."""
     first = True
     last_heard = clock()
     overlay.set_info("MODE", "COMMAND")
@@ -59,6 +66,13 @@ def run_session(*, overlay, typed, listen, ask_command, run_command, speak,
         if typed:
             overlay.expand()
 
+        if is_rest(text):                           # "okay, now get back to rest" - always hers, never the AI's
+            on_rest()
+            overlay.set_caption(you=text, reply="")
+            overlay.set_state("speaking")
+            speak("Okay, resting. Say Hey Hinata when you need me.")
+            return "rest"
+
         if is_end(text):
             overlay.set_caption(you=text, reply="")
             overlay.set_state("speaking")
@@ -69,6 +83,8 @@ def run_session(*, overlay, typed, listen, ask_command, run_command, speak,
         drain()                                      # drop hotkey taps made while she talked
         if getattr(overlay, "consume_sleep", lambda: False)():
             return "sleep"
+        if outcome == "confirm":
+            continue                                 # waiting for your "confirm" / "cancel"
         if outcome == "action" or not conversation_mode:
             return "action"
 

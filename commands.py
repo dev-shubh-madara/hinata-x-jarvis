@@ -653,7 +653,7 @@ def handle(text: str) -> str:
         quick.listen_mode(True)
         return _info("Listen mode on. Just say the command - no need for my name. Say stop listening when you're done.")
     import quick as _q
-    if _q.in_listen_mode() and _q.is_rest(t):
+    if _q.is_rest(t):
         _q.listen_mode(False)
         return _info("Okay, resting. Say Hey Hinata when you need me.")
     if re.fullmatch(r"(?:stop listening|listen(?:ing)? mode off|(?:turn off|exit|stop|end) (?:listen(?:ing)?|dictation|"

@@ -143,6 +143,7 @@ Hinata stays out of your way. No full-screen hologram, no "Done" after every act
 | "Hinata, select all" · "copy" · "paste" · "undo" · "delete that" | The shortcut, instantly |
 | "Hinata, type see you full stop" | Spoken punctuation: full stop, comma, question mark |
 | **"Hey Hinata"** (on its own) | She stays awake and takes every command and question, no name needed, until you say **"okay, now get back to rest"** |
+| **"Okay, now get back to rest"** | She goes back to resting at once, from any mode. While resting, nothing around you is acted on; only a sentence that starts with "Hinata" wakes her, for that one command |
 | **"Hinata, listen mode"** | Commands only, no name needed, for two quiet minutes; normal talk is ignored. "Stop listening" ends it |
 | **"Hinata, learn my voice"** | Talk for ~15 seconds once. From then on she only obeys **your** voice; other people, the TV and videos are ignored. "Voice lock off" / "voice lock on" / "forget my voice" |
 | **"Hinata, show hologram"** | Brings the full-screen 3D hologram back. "Hologram off" hides it |

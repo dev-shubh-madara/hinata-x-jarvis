@@ -33,7 +33,7 @@ def _fire(kind: str, text: str = ""):
 
 def fire_wake(rest: str):
     """Wake word heard. rest = what came after her name ('' = just listen)."""
-    _fire("voice", rest)
+    _fire("wake", rest)
 
 
 def install_hotkeys():
@@ -52,7 +52,13 @@ def wait_for_trigger() -> str:
     """Blocks until a hotkey or the wake word fires. Returns 'voice' or 'type'."""
     kind, text = _triggers.get()
     _first["text"] = text
-    return kind
+    _first["wake"] = kind == "wake"
+    return "voice" if kind == "wake" else kind
+
+
+def from_wake() -> bool:
+    """True if the current session was started by her name (not a hotkey)."""
+    return bool(_first.get("wake"))
 
 
 def has_first_text() -> bool:

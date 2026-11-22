@@ -263,13 +263,18 @@ def keep_alive():
         _listen["until"] = time.time() + _idle()
 
 
-REST = re.compile(r"\b(?:(?:get|go)(?: back)? to (?:rest|sleep)|back to (?:rest|sleep)|(?:you can |now )?(?:rest|sleep) now|"
-                  r"take rest|go rest|you can (?:rest|go)|stop listening|that'?s all|we'?re done|"
-                  r"aaram karo|so jao)\b", re.I)
+REST = re.compile(r"(?:(?:get|go|going|come)(?: back)? (?:to )?(?:rest|sleep)|back to (?:rest|sleep)|get rest back|"
+                  r"(?:you can |now |please )?(?:rest|sleep) now|take (?:a )?rest|go rest|you can (?:rest|go now)|"
+                  r"stop listening|that'?s all|we'?re done|sit down for now|don'?t disturb me|be quiet|"
+                  r"shut up|silent mode|go silent|aaram karo|so jao|chup)", re.I)
 
 
 def is_rest(text: str) -> bool:
-    return bool(REST.search(normalize(text)))
+    """'okay, now get back to rest' and friends. Short sentences only, so a long sentence that merely
+    contains 'rest' ('let's rest the case...') isn't taken as an order."""
+    t = normalize(text)
+    t = re.sub(r"^(?:ok(?:ay)?|hey|hinata|now|so|alright|right)[, ]+", "", t)
+    return len(t.split()) <= 12 and bool(REST.search(t))
 
 
 QUESTION_START = re.compile(

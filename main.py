@@ -175,7 +175,11 @@ def voice_loop(overlay: MicOverlay):
                 chime=(lambda: None) if hotkey_listener.has_first_text() else tts_engine.chime,
                 drain=hotkey_listener.drain,
                 is_end=commands.is_end_phrase,
-                conversation_mode=config.CONVERSATION_MODE,
+                is_rest=quick.is_rest,
+                on_rest=lambda: quick.listen_mode(False),
+                # woken by her name: one command, then back to resting (no open mic afterwards).
+                # The hotkey keeps the old back-and-forth conversation.
+                conversation_mode=config.CONVERSATION_MODE and not hotkey_listener.from_wake(),
                 first_timeout=config.LISTEN_TIMEOUT,
                 follow_timeout=config.CONVO_LISTEN_TIMEOUT,
                 idle_seconds=config.CONVO_IDLE_SECONDS,

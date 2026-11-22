@@ -63,3 +63,10 @@
   pieces and drops the ones that don't match the rest, so a friend talking during it isn't learned as you.
   In testing with synthetic voices: 30/30 own commands accepted, 0/90 from 9 other voices, 0/10 from a voice
   that talked during learning. Every decision is logged with its score for tuning `VOICE_THRESHOLD`.
+- Resting is now strict. After "get back to rest" (or "go to sleep", "that's all", "be quiet"...) nothing is acted on
+  until a sentence starts with her name. The rest phrase is handled by Hinata herself in every mode and never goes
+  to the AI (before, inside a conversation it reached the AI, which only replied "Understood" and kept listening).
+- Sessions started by her name are one command: she does it and goes back to resting instead of keeping the mic open
+  for follow-ups (that picked up game audio and friends talking). The hotkey keeps the back-and-forth conversation.
+- The speech-to-text hint is just "Hey Hinata." - example commands in it made Whisper hear "Hinata, go." when only
+  her name was said.
